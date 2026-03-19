@@ -1,0 +1,498 @@
+/* ========================================
+   Agent Ticket Manager - Reverted Professional Style
+   ======================================== */
+
+.agent-ticket-manager {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+    color: #1f2937;
+    gap: 0.75rem;
+}
+
+/* ---- Sticky top block (title + current ticket) ---- */
+.agent-ticket-manager .atm-main-container {
+    padding: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1.5rem;
+    /* border-bottom removed */
+}
+
+.header-text h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin: 0;
+    padding: 0.2rem 0;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #1e293b, #475569);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.header-text p {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+}
+
+.agent-info-badge {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.agent-name {
+    font-weight: 600;
+    color: #111827;
+    font-size: 1.1rem;
+}
+
+.guichet-badge {
+    font-size: 0.8rem;
+    color: #6b7280;
+    background-color: #f1f5f9;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    display: inline-block;
+    width: fit-content;
+    margin-left: auto;
+    border: 1px solid #e2e8f0;
+}
+
+/* ---- Display Area ---- */
+.ticket-display-area {
+    width: 100%;
+    min-height: 200px;
+}
+
+/* ---- Searching / Pause States ---- */
+.status-placeholder {
+    background: #ffffff;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+    border-radius: 20px;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.placeholder-icon {
+    font-size: 2.5rem;
+}
+
+.status-placeholder h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+}
+
+.status-placeholder p {
+    color: #64748b;
+    margin: 0;
+}
+
+/* Pulse animation for searching */
+.searching-pulse {
+    width: 40px;
+    height: 40px;
+    background-color: #8b5cf6;
+    border-radius: 50%;
+    animation: searchingPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes searchingPulse {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.1;
+    }
+
+    100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+}
+
+/* ---- Shared Ticket Card (Exactly like Placeholder - Refined) ---- */
+.agent-ticket-manager .ticket-card {
+    background: #ffffff;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+    border-radius: 20px;
+    padding: 3rem;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 2rem;
+}
+
+.ticket-card-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex: 1.6;
+}
+
+.ticket-card-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex: 1;
+    gap: 1.5rem;
+}
+
+.ticket-header-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.30rem;
+}
+
+.ticket-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.ticket-number-row {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.ticket-number {
+    font-size: 2.25rem;
+    font-weight: 900;
+    line-height: 1;
+    margin: 0;
+    background: linear-gradient(135deg, #4f0bfb 0%, #a208b5 50%, #d4145a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+}
+
+.priority-tag {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.priority-normal {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.priority-urgent {
+    background: #fff7ed;
+    color: #f97316;
+}
+
+.priority-vip {
+    background: #fefce8;
+    color: #eab308;
+}
+
+/* Actions Left */
+.ticket-actions-left {
+    display: flex;
+    gap: 1rem;
+}
+
+.action-btn-small {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn-small:hover {
+    background: #f1f5f9;
+    transform: translateY(-1px);
+}
+
+/* Service Info (Right) */
+.ticket-service-group {
+    text-align: right;
+}
+
+.ticket-service {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 0.2rem;
+    display: block;
+}
+
+/* Terminer Button (Right) */
+.btn-terminer-mockup {
+    background: linear-gradient(135deg, #4f0bfb 0%, #a208b5 50%, #d4145a 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(79, 11, 251, 0.3);
+}
+
+.btn-terminer-mockup:hover {
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+}
+
+.btn-terminer-mockup:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes ticketAppear {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ticketExitLeft {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+}
+
+@keyframes ticketExitRight {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+}
+
+.ticket-appear {
+    animation: ticketAppear 0.4s ease-out forwards;
+}
+
+.ticket-exit-left {
+    animation: ticketExitLeft 0.4s ease-in forwards;
+}
+
+.ticket-exit-right {
+    animation: ticketExitRight 0.4s ease-in forwards;
+}
+
+.ticket-calling {
+    animation: pulseCallingATM 1.5s infinite;
+    border-color: #8b5cf6 !important;
+}
+
+@keyframes pulseCallingATM {
+    0% {
+        box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.3);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(139, 92, 246, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+    }
+}
+
+/* Status Footer */
+.atm-status-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    z-index: 50;
+    background: #ffffff;
+    border-top: 1px solid rgba(229, 231, 235, 1);
+    padding: 1rem 2.5rem;
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: left 0.3s ease;
+}
+
+.status-footer-content {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.status-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.status-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1.6rem;
+    border-radius: 9999px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.status-btn.active.btn-pause {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #ef4444;
+}
+
+.status-btn.active.btn-pret {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #16a34a;
+}
+
+/* Responsiveness */
+@media (max-width: 1024px) {
+    .agent-ticket-manager .ticket-card {
+        padding: 1.5rem;
+    }
+
+    .ticket-number {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .agent-ticket-manager .ticket-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1.5rem;
+        padding: 1.25rem;
+    }
+
+    .ticket-card-left,
+    .ticket-card-right {
+        align-items: center;
+        text-align: center;
+        flex: none;
+        gap: 1rem;
+    }
+
+    .ticket-header-group,
+    .ticket-service-group {
+        align-items: center;
+        text-align: center;
+    }
+
+    .ticket-actions-left {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .action-btn-small {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .btn-terminer-mockup {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .atm-status-footer {
+        left: 0;
+        padding: 0.75rem 1rem;
+    }
+
+    .status-footer-content {
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .status-label {
+        display: none;
+    }
+
+    .status-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+
+    .header-text h1 {
+        font-size: 1.5rem;
+    }
+}

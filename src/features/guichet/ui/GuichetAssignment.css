@@ -1,0 +1,148 @@
+.guichet_assignment {
+    width: 100%;
+}
+
+.guichet-select {
+    font-weight: 600;
+}
+
+.services-checklist-container {
+    margin-top: 1.5rem;
+}
+
+.checklist-grid-modal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Scrollbar styling for modal checklist */
+.checklist-grid-modal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.checklist-grid-modal::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+}
+
+.checklist-grid-modal::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.checklist-item-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.checklist-item-compact:hover {
+    border-color: #8b5cf6;
+    background: #ffffff;
+}
+
+.checklist-item-compact.checked {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+}
+
+.checklist-item-compact input {
+    position: absolute;
+    opacity: 0;
+}
+
+.checkbox-custom {
+    width: 20px;
+    height: 20px;
+    background-color: #ffffff;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.checklist-item-compact.checked .checkbox-custom {
+    background-color: #8b5cf6;
+    border-color: #8b5cf6;
+}
+
+.checkbox-custom::after {
+    content: "";
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    display: none;
+    margin-bottom: 2px;
+}
+
+.checklist-item-compact.checked .checkbox-custom::after {
+    display: block;
+}
+
+.service-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.service-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.empty-row {
+    text-align: center;
+    padding: 3rem !important;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.empty-state-small {
+    padding: 1.5rem;
+    text-align: center;
+    color: #94a3b8;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px dashed #e2e8f0;
+    margin-top: 0.5rem;
+}
+
+.agent-select {
+    margin-bottom: 0.5rem;
+}
+
+.agent-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: #475569;
+}
+
+.agent-name-cell::before {
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+    .checklist-grid-modal {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,777 @@
+import React, { useEffect, useState, useRef } from "react";
+import { MdPhone, MdSkipNext, MdCheckCircle } from "react-icons/md";
+import { TbDatabaseOff } from "react-icons/tb";
+import { FaCoffee } from "react-icons/fa";
+import "./AgentTicketManager.css";
+import { supabase } from "../../../../shared/api/supabaseClient";
+import type { Ticket, SousService } from "../../../../shared/types";
+import { sortByPriority } from "../../../../shared/utils/priorityUtils";
+import { RealtimeChannel } from "@supabase/supabase-js";
+
+export const AgentTicketManager: React.FC = () => {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userAgenceId, setUserAgenceId] = useState<string | null>(null);
+  const [animatingOutId, setAnimatingOutId] = useState<string | null>(null);
+  const [exitType, setExitType] = useState<"ignore" | "done" | null>(null);
+  const [justCalledId, setJustCalledId] = useState<string | null>(null);
+  const [agentName, setAgentName] = useState<string | null>(null);
+  const [guichetName, setGuichetName] = useState<string | null>(null);
+  const [agentStatus, setAgentStatus] = useState<"pret" | "pause">("pause");
+  const [isSearching, setIsSearching] = useState(false);
+  const [guichetServices, setGuichetServices] = useState<string[]>([]);
+  const [availableGuichets, setAvailableGuichets] = useState<string[]>([]);
+  const [guichetAppellations, setGuichetAppellations] = useState<
+    Record<string, string>
+  >({});
+  const [activeGuichets, setActiveGuichets] = useState<string[]>([]);
+  const [isLoadingGuichets, setIsLoadingGuichets] = useState(true);
+
+  // Sous-services logic
+  const [currentSousServices, setCurrentSousServices] = useState<SousService[]>(
+    [],
+  );
+  const [selectedSousServiceId, setSelectedSousServiceId] =
+    useState<string>("");
+
+  const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
+
+  useEffect(() => {
+    // Prepare global channel for manually broadcasting "rappel" to the dashboard
+    broadcastChannelRef.current = supabase.channel("public_dashboard_tickets");
+    broadcastChannelRef.current.subscribe();
+
+    return () => {
+      if (broadcastChannelRef.current) {
+        supabase.removeChannel(broadcastChannelRef.current);
+      }
+    };
+  }, []);
+
+  // Fonction pour libérer le guichet actuel
+  const releaseGuichet = async (agentId: string) => {
+    try {
+      await supabase.from("active_guichets").delete().eq("user_id", agentId);
+    } catch (error) {
+      console.error("Erreur lors de la libération du guichet:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchUserAndGuichets = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+
+        // Fetch agent name & agence_id
+        const { data: userData } = await supabase
+          .from("users")
+          .select("nom_user, agence_id")
+          .eq("id", user.id)
+          .single();
+
+        if (userData) {
+          setAgentName(userData.nom_user);
+          setUserAgenceId(userData.agence_id);
+
+          if (userData.agence_id) {
+            setIsLoadingGuichets(true);
+            // Fetch custom appellations
+            const { data: appData } = await supabase
+              .from("guichet")
+              .select("nom_guichet, appellation")
+              .eq("agence_id", userData.agence_id);
+
+            if (appData) {
+              const mapping: Record<string, string> = {};
+              appData.forEach((item) => {
+                if (item.appellation) {
+                  mapping[item.nom_guichet] = item.appellation;
+                }
+              });
+              setGuichetAppellations(mapping);
+            }
+
+            // Fetch currently active/taken guichets
+            const { data: activeData } = await supabase
+              .from("active_guichets")
+              .select("nom_guichet, user_id")
+              .eq("agence_id", userData.agence_id);
+
+            if (appData) {
+              const distinctGuichets = Array.from(
+                new Set(appData.map((g) => g.nom_guichet)),
+              );
+              setAvailableGuichets(distinctGuichets);
+            }
+            if (activeData) {
+              setActiveGuichets(activeData.map((a) => a.nom_guichet));
+
+              // Auto-reconnect current user to their guichet if applicable
+              const myActiveGuichet = activeData.find(
+                (a) => a.user_id === user.id,
+              );
+              if (myActiveGuichet) {
+                const { data: servicesData } = await supabase
+                  .from("guichet_service")
+                  .select("service_id")
+                  .eq("nom_guichet", myActiveGuichet.nom_guichet)
+                  .eq("agence_id", userData.agence_id);
+
+                if (servicesData && servicesData.length > 0) {
+                  setGuichetName(myActiveGuichet.nom_guichet);
+                  setGuichetServices(servicesData.map((s) => s.service_id));
+                } else {
+                  // Invalid state, release it
+                  releaseGuichet(user.id);
+                  setActiveGuichets((prev) =>
+                    prev.filter((g) => g !== myActiveGuichet.nom_guichet),
+                  );
+                }
+              }
+            }
+          }
+          // Fin du chargement peu importe le résultat (même s'il n'y a pas d'agence_id)
+          setIsLoadingGuichets(false);
+        } else {
+          // Fin du chargement si l'utilisateur n'a pas pu être récupéré
+          setIsLoadingGuichets(false);
+        }
+      } else {
+        // Fin du chargement si pas d'utilisateur connecté
+        setIsLoadingGuichets(false);
+      }
+    };
+    fetchUserAndGuichets();
+
+    // Suppression du nettoyage automatique pour permettre la navigation :
+    // l'agent ne sera déconnecté du guichet que s'il clique explicitement sur "(Quitter)"
+  }, []);
+
+  // Souscription temps réel aux changements de guichets (refresh la liste des guichets pris)
+  useEffect(() => {
+    if (!userAgenceId) return;
+
+    const channel = supabase
+      .channel("active_guichets_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "active_guichets",
+          // On enlève le filtre agence_id car lors d'un DELETE,
+          // Supabase n'envoie pas toujours les colonnes (Replica Identity par défaut),
+          // ce qui fait que le filtre ignorait l'évènement de libération.
+        },
+        async () => {
+          // Refresh active guichets list
+          const { data } = await supabase
+            .from("active_guichets")
+            .select("nom_guichet")
+            .eq("agence_id", userAgenceId);
+
+          if (data) {
+            setActiveGuichets(data.map((a) => a.nom_guichet));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userAgenceId]);
+
+  const handleSelectGuichet = async (selectedName: string) => {
+    if (!userAgenceId || !userId) return;
+
+    // Optimisation de l'UI : On le marque comme pris immédiatement
+    setActiveGuichets((prev) => [...prev, selectedName]);
+
+    // 1. Tenter de s'enregistrer sur le guichet
+    const { error: lockError } = await supabase.from("active_guichets").insert({
+      nom_guichet: selectedName,
+      agence_id: userAgenceId,
+      user_id: userId,
+    });
+
+    if (lockError) {
+      console.error("Impossible de prendre ce guichet:", lockError);
+      alert(
+        "Ce guichet est déjà occupé par un autre agent ou une erreur est survenue.",
+      );
+      return;
+    }
+
+    // 2. Fetch services for selected guichet
+    const { data: servicesData } = await supabase
+      .from("guichet_service")
+      .select("service_id")
+      .eq("nom_guichet", selectedName)
+      .eq("agence_id", userAgenceId);
+
+    if (servicesData && servicesData.length > 0) {
+      setGuichetName(selectedName);
+      setGuichetServices(servicesData.map((s) => s.service_id));
+    } else {
+      console.warn("Aucun service trouvé pour ce guichet");
+      setGuichetServices([]);
+      releaseGuichet(userId);
+      setActiveGuichets((prev) => prev.filter((g) => g !== selectedName)); // Rollback si pas de service
+    }
+  };
+
+  const handleLeaveGuichet = async () => {
+    if (!userId) return;
+
+    // Optimisation de l'UI : on libère localement de suite pour éviter de voir "Occupé" au retour
+    if (guichetName) {
+      setActiveGuichets((prev) => prev.filter((g) => g !== guichetName));
+    }
+
+    await releaseGuichet(userId);
+    setGuichetName(null);
+    setAgentStatus("pause");
+    setGuichetServices([]);
+  };
+
+  const handleStatusChange = async (newStatus: "pret" | "pause") => {
+    if (newStatus === "pret" && agentStatus === "pause") {
+      setAgentStatus("pret");
+      setIsSearching(true);
+
+      // Find first waiting ticket to make it "ready"
+      const waitingTicket = tickets.find((t) => t.status === "waiting");
+      if (waitingTicket && userId) {
+        const { error } = await supabase
+          .from("ticket")
+          .update({
+            status: "ready",
+            user_id: userId,
+            nom_guichet: guichetName,
+          })
+          .eq("id", waitingTicket.id)
+          .eq("status", "waiting"); // Extra safety check
+
+        if (!error) {
+          setTickets((prev) =>
+            prev.map((t) =>
+              t.id === waitingTicket.id
+                ? {
+                    ...t,
+                    status: "ready" as const,
+                    user_id: userId,
+                    nom_guichet: guichetName,
+                  }
+                : t,
+            ),
+          );
+        }
+      }
+
+      setTimeout(() => {
+        setIsSearching(false);
+      }, 1000);
+    } else {
+      setAgentStatus(newStatus);
+      setIsSearching(false);
+    }
+  };
+
+  const formatTicketNumber = (ticketNumber: string | undefined) => {
+    if (!ticketNumber) return "";
+    return ticketNumber;
+  };
+
+  const getPriorityClass = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case "vip":
+        return "priority-vip";
+      case "urgent":
+        return "priority-urgent";
+      default:
+        return "priority-normal";
+    }
+  };
+
+  useEffect(() => {
+    if (guichetServices.length === 0) return;
+
+    const fetchTickets = async () => {
+      const { data: dataTicket, error: dataError } = await supabase
+        .from("ticket")
+        .select("*, service(nom_service)")
+        .in("status", ["waiting", "ready", "called"])
+        .in("service_id", guichetServices)
+        .order("created_at", { ascending: true });
+
+      if (dataTicket) {
+        setTickets(sortByPriority(dataTicket as Ticket[]));
+      } else if (dataError) {
+        console.error("Erreur lors de la récupération des tickets:", dataError);
+      }
+    };
+    fetchTickets();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel("ticket_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ticket",
+          filter: `service_id=in.(${guichetServices.join(",")})`,
+        },
+        () => {
+          fetchTickets();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [guichetServices]);
+
+  const activeTicket = tickets.find(
+    (t) =>
+      (t.status === "called" || t.status === "ready") && t.user_id === userId,
+  );
+  const firstWaitingTicket = tickets.find((t) => t.status === "waiting");
+  const currentTicket =
+    activeTicket || (isSearching ? null : firstWaitingTicket);
+
+  useEffect(() => {
+    const loadSousServicesForCurrentTicket = async () => {
+      if (currentTicket && currentTicket.service_id) {
+        const { data, error } = await supabase
+          .from("sous_service")
+          .select("*")
+          .eq("service_id", currentTicket.service_id)
+          .order("nom_sous_service", { ascending: true });
+
+        if (data && !error) {
+          setCurrentSousServices(data as SousService[]);
+        } else {
+          setCurrentSousServices([]);
+        }
+      } else {
+        setCurrentSousServices([]);
+      }
+    };
+
+    loadSousServicesForCurrentTicket();
+    // Force la réinitialisation du choix à chaque NOUVEAU ticket
+    setSelectedSousServiceId("");
+  }, [currentTicket?.id, currentTicket?.service_id]);
+
+  const handleAppeler = async (ticket: Ticket) => {
+    if (!userId) return;
+
+    if (ticket.status === "waiting" || ticket.status === "ready") {
+      const dateDebut = ticket.date_debut || new Date().toISOString();
+      const updatePayload: Partial<Ticket> = {
+        status: "called" as const,
+        user_id: userId,
+        nom_guichet: guichetName ?? undefined,
+        date_debut: dateDebut,
+      };
+
+      const { error } = await supabase
+        .from("ticket")
+        .update(updatePayload)
+        .eq("id", ticket.id);
+
+      if (!error) {
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.id === ticket.id
+              ? {
+                  ...t,
+                  ...updatePayload,
+                }
+              : t,
+          ),
+        );
+      }
+    } else if (ticket.status === "called") {
+      console.log("Rappel du ticket:", ticket.numero_ticket);
+      setJustCalledId(ticket.id);
+      setTimeout(() => setJustCalledId(null), 1500);
+
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.send({
+          type: "broadcast",
+          event: "rappel_ticket",
+          payload: { ticket },
+        });
+      }
+    }
+  };
+
+  const handleIgnorer = async (ticket: Ticket) => {
+    setExitType("ignore");
+    setAnimatingOutId(ticket.id);
+
+    setTimeout(async () => {
+      const { error } = await supabase
+        .from("ticket")
+        .update({ status: "cancelled" })
+        .eq("id", ticket.id);
+
+      if (!error) {
+        setTickets((prev) => prev.filter((t) => t.id !== ticket.id));
+        setAgentStatus("pause");
+      }
+      setAnimatingOutId(null);
+      setExitType(null);
+    }, 500);
+  };
+
+  const handleTerminer = async (ticket: Ticket) => {
+    // Enforce sous-service selection if there are sous-services available
+    if (currentSousServices.length > 0 && !selectedSousServiceId) {
+      alert("Veuillez choisir un sous-service avant de terminer ce ticket.");
+      return;
+    }
+
+    setExitType("done");
+    setAnimatingOutId(ticket.id);
+
+    setTimeout(async () => {
+      const dateFin = new Date().toISOString();
+
+      const updatePayload: Partial<Ticket> = {
+        status: "done" as const,
+        date_fin: dateFin,
+      };
+
+      // Fallback si l'agent a cliqué sur 'Terminer' sans jamais cliquer sur 'Appeler'
+      if (!ticket.date_debut) {
+        updatePayload.date_debut = dateFin;
+      }
+
+      if (selectedSousServiceId) {
+        updatePayload.sous_service_id = selectedSousServiceId;
+      }
+
+      const { error } = await supabase
+        .from("ticket")
+        .update(updatePayload)
+        .eq("id", ticket.id);
+
+      if (!error) {
+        setTickets((prev) => prev.filter((t) => t.id !== ticket.id));
+        setAgentStatus("pause");
+      }
+      setAnimatingOutId(null);
+      setExitType(null);
+    }, 500);
+  };
+
+  // Computations claires pour l'état du bouton "Terminer"
+  const isTicketCalled = currentTicket?.status === "called";
+  const needsSousService = currentSousServices.length > 0;
+  const hasSelectedSousService = selectedSousServiceId !== "";
+
+  // Le bouton peut terminer SI le ticket est appelé ET (s'il n'y a pas de sous-service requis OU s'il y en a un sélectionné)
+  const canTerminate =
+    isTicketCalled && (!needsSousService || hasSelectedSousService);
+  const isTerminerDisabled = !canTerminate;
+
+  return (
+    <div className="agent-ticket-manager">
+      {/* Si aucun guichet n'est sélectionné, on affiche l'écran de sélection */}
+      {!guichetName ? (
+        <div
+          className="atm-main-container"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100%",
+          }}
+        >
+          {isLoadingGuichets ? (
+            <div className="status-placeholder searching-mode">
+              <div className="searching-pulse"></div>
+              <h3>Recherche des postes...</h3>
+              <p>Veuillez patienter quelques instants.</p>
+            </div>
+          ) : availableGuichets.length > 0 ? (
+            <div className="status-placeholder">
+              <div className="placeholder-icon">🏢</div>
+              <h3>Sélectionnez votre poste de travail</h3>
+              <p style={{ marginBottom: "2rem" }}>
+                Veuillez choisir le guichet sur lequel vous êtes connecté
+                aujourd'hui.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1rem",
+                  width: "100%",
+                  maxWidth: "300px",
+                }}
+              >
+                {availableGuichets.map((g) => {
+                  const isTaken = activeGuichets.includes(g);
+                  const customName = guichetAppellations[g]
+                    ? `(${guichetAppellations[g]})`
+                    : "";
+                  return (
+                    <button
+                      key={g}
+                      className={`primary-gradient-btn ${isTaken ? "disabled-btn" : ""}`}
+                      onClick={() => !isTaken && handleSelectGuichet(g)}
+                      style={{
+                        opacity: isTaken ? 0.5 : 1,
+                        cursor: isTaken ? "not-allowed" : "pointer",
+                      }}
+                      disabled={isTaken}
+                      title={isTaken ? "Déjà occupé par un autre agent" : ""}
+                    >
+                      {g} {customName} {isTaken && "[Occupé]"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="status-placeholder empty-mode">
+              <div
+                className="placeholder-icon"
+                style={{ fontSize: "3rem", opacity: 0.5 }}
+              >
+                📭
+              </div>
+              <h3>Aucun poste libre</h3>
+              <p>Aucun guichet n'est configuré pour cette agence.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="atm-main-container">
+            <header className="page-header">
+              <div className="header-text">
+                <h1>Appel Tickets</h1>
+                <p>Gérez et appelez les tickets de votre guichet</p>
+              </div>
+              <div
+                className="agent-info-badge"
+                style={{ cursor: "pointer" }}
+                onClick={handleLeaveGuichet}
+                title="Quitter ce guichet"
+              >
+                <span className="agent-name">{agentName || "Agent"}</span>
+                <span className="guichet-badge">
+                  {guichetName
+                    ? `${guichetName} ${guichetAppellations[guichetName] ? `(${guichetAppellations[guichetName]})` : ""}`
+                    : "Guichet non assigné"}{" "}
+                  (Quitter)
+                </span>
+              </div>
+            </header>
+
+            <div className="ticket-display-area">
+              {agentStatus === "pause" ? (
+                <div className="status-placeholder pause-mode">
+                  <div className="placeholder-icon">
+                    <FaCoffee />
+                  </div>
+                  <h3>En Pause</h3>
+                  <p>
+                    Cliquez sur "Prêt" pour commencer à recevoir des tickets.
+                  </p>
+                </div>
+              ) : isSearching ? (
+                <div className="status-placeholder searching-mode">
+                  <div className="searching-pulse"></div>
+                  <h3>Recherche du prochain ticket...</h3>
+                  <p>Veuillez patienter quelques instants.</p>
+                </div>
+              ) : currentTicket ? (
+                <div
+                  key={currentTicket.id}
+                  className={`ticket-card ticket-card--active ticket-appear
+                                ${animatingOutId === currentTicket.id ? (exitType === "ignore" ? "ticket-exit-left" : "ticket-exit-right") : ""} 
+                                ${currentTicket.status === "called" || justCalledId === currentTicket.id ? "ticket-calling" : ""}`}
+                >
+                  <div className="ticket-card-left">
+                    <div className="ticket-header-group">
+                      <span className="ticket-label">Ticket en cours</span>
+                      <div className="ticket-number-row">
+                        <span className="ticket-number">
+                          {formatTicketNumber(currentTicket.numero_ticket)}
+                        </span>
+                        <span
+                          className={`priority-tag ${getPriorityClass(currentTicket.niveau)}`}
+                        >
+                          {currentTicket.niveau}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ticket-actions-left">
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.5rem",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        <button
+                          className="action-btn-small"
+                          onClick={() => handleAppeler(currentTicket)}
+                        >
+                          <MdPhone />{" "}
+                          {currentTicket.status === "called"
+                            ? "Rappeler"
+                            : "Appeler"}
+                        </button>
+                        <button
+                          className="action-btn-small btn-ignore"
+                          onClick={() => handleIgnorer(currentTicket)}
+                        >
+                          <MdSkipNext /> Ignorer
+                        </button>
+
+                        {/* Sélection du sous-service */}
+                        {currentSousServices.length > 0 &&
+                          (currentTicket.status === "called" ||
+                            currentTicket.status === "ready") && (
+                            <div
+                              className="ticket-sous-service-inline"
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                                marginLeft: "auto",
+                              }}
+                            >
+                              <label
+                                htmlFor="sous-service-select"
+                                className="ticket-label"
+                                style={{
+                                  marginBottom: 0,
+                                  fontSize: "0.8rem",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Sous-service{" "}
+                                <span style={{ color: "var(--danger-color)" }}>
+                                  *
+                                </span>{" "}
+                                :
+                              </label>
+                              <select
+                                id="sous-service-select"
+                                value={selectedSousServiceId}
+                                onChange={(e) =>
+                                  setSelectedSousServiceId(e.target.value)
+                                }
+                                className="auth-input"
+                                style={{
+                                  padding: "0.4rem",
+                                  fontSize: "0.85rem",
+                                  backgroundColor: "var(--bg-glass)",
+                                  width: "auto",
+                                  minWidth: "150px",
+                                }}
+                              >
+                                <option value="" disabled>
+                                  --- Choisir ---
+                                </option>
+                                {currentSousServices.map((ss) => (
+                                  <option key={ss.id} value={ss.id}>
+                                    {ss.nom_sous_service}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ticket-card-right">
+                    <div
+                      className="ticket-service-group"
+                      style={{ flexGrow: 1 }}
+                    >
+                      <span className="ticket-label">Service</span>
+                      <span className="ticket-service">
+                        {currentTicket.service?.nom_service || "N/A"}
+                      </span>
+                    </div>
+
+                    <button
+                      className="btn-terminer-mockup"
+                      onClick={() => handleTerminer(currentTicket)}
+                      disabled={isTerminerDisabled}
+                      style={{
+                        opacity: isTerminerDisabled ? 0.5 : 1,
+                        cursor: isTerminerDisabled ? "not-allowed" : "pointer",
+                        backgroundColor:
+                          needsSousService && !hasSelectedSousService
+                            ? "var(--text-disabled)"
+                            : "",
+                      }}
+                      title={
+                        isTerminerDisabled
+                          ? isTicketCalled
+                            ? "Veuillez sélectionner un sous-service"
+                            : "Veuillez cliquer sur 'Appeler' en premier"
+                          : ""
+                      }
+                    >
+                      <MdCheckCircle /> Terminer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="status-placeholder empty-mode">
+                  <div className="placeholder-icon">
+                    <TbDatabaseOff />
+                  </div>
+                  <h3>Aucun ticket en attente</h3>
+                  <p>Tous les tickets de vos services ont été traités.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ---- Status Footer ---- */}
+          <div className="atm-status-footer">
+            <div className="status-footer-content">
+              <span className="status-label">Statut :</span>
+              <div className="status-buttons">
+                <button
+                  className={`status-btn btn-pause ${agentStatus === "pause" ? "active" : ""}`}
+                  onClick={() => handleStatusChange("pause")}
+                >
+                  <span className="status-dot"></span>
+                  Pause
+                </button>
+                <button
+                  className={`status-btn btn-pret ${agentStatus === "pret" ? "active" : ""}`}
+                  onClick={() => handleStatusChange("pret")}
+                >
+                  <span className="status-dot"></span>
+                  Prêt
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
