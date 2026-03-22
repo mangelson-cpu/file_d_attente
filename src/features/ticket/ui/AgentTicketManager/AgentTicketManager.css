@@ -496,3 +496,46 @@
         font-size: 1.5rem;
     }
 }
+
+/* ========================================
+   Reactions Animation (IoT Tablet)
+   ======================================== */
+.reactions-container {
+    position: absolute;
+    bottom: 100%; /* Start just above the exact button element */
+    right: 50%; /* Center relative to the button wrapper */
+    transform: translateX(50%);
+    width: 60px;
+    height: 120px;
+    pointer-events: none;
+    z-index: 1000;
+    overflow: visible;
+}
+
+.floating-emoji {
+    position: absolute;
+    bottom: 0px;
+    font-size: 2.5rem;
+    animation: floatUpMini 2s ease-out forwards;
+    opacity: 0;
+}
+
+@keyframes floatUpMini {
+    0% {
+        bottom: 0px;
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    15% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+    30% {
+        transform: scale(1);
+    }
+    100% {
+        bottom: 80px;
+        opacity: 0;
+        transform: scale(0.8);
+    }
+}

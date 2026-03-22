@@ -33,6 +33,9 @@ export const AgentTicketManager: React.FC = () => {
   const [selectedSousServiceId, setSelectedSousServiceId] =
     useState<string>("");
 
+  const [reactions, setReactions] = useState<{ id: string; emoji: string; left: number }[]>([]);
+  const [persistentReaction, setPersistentReaction] = useState<string | null>(null);
+
   const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
@@ -346,6 +349,83 @@ export const AgentTicketManager: React.FC = () => {
     loadSousServicesForCurrentTicket();
   }, [currentTicket]);
 
+  useEffect(() => {
+    setPersistentReaction(null);
+
+    if (currentTicket?.numero_ticket) {
+      const fetchExistingEvaluation = async () => {
+        const { data } = await supabase
+          .from("evaluations")
+          .select("score")
+          .eq("ticket_numero", currentTicket.numero_ticket)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data) {
+          const score = data.score;
+          let emoji = "👍";
+          if (score === 1) emoji = "😍";
+          else if (score === 2) emoji = "😐";
+          else if (score === 3) emoji = "😡";
+          setPersistentReaction(emoji);
+        }
+      };
+
+      fetchExistingEvaluation();
+    }
+  }, [currentTicket?.numero_ticket]);
+
+  useEffect(() => {
+    if (!currentTicket?.numero_ticket) return;
+
+    console.log("Abonnement Realtime activé pour le ticket:", currentTicket.numero_ticket);
+
+    const channel = supabase
+      .channel(`evaluations_${currentTicket.numero_ticket}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "evaluations",
+        },
+        (payload) => {
+          console.log("NOUVEAU VOTE REÇU EN TEMPS RÉEL :", payload);
+          
+          if (payload.new.ticket_numero !== currentTicket.numero_ticket) {
+            console.log("Ignoré: vote pour un autre ticket", payload.new.ticket_numero);
+            return;
+          }
+
+          const score = payload.new.score;
+          let emoji = "👍";
+          if (score === 1) emoji = "😍";
+          else if (score === 2) emoji = "😐";
+          else if (score === 3) emoji = "😡";
+
+          const newReaction = {
+            id: payload.new.id || Date.now().toString(),
+            emoji,
+            left: 20 + Math.random() * 60, // random horizontal offset (20% to 80%)
+          };
+          setReactions((prev) => [...prev, newReaction]);
+
+          setTimeout(() => {
+            setReactions((prev) => prev.filter((r) => r.id !== newReaction.id));
+            setPersistentReaction(emoji); // Fixer l'emoji à côté du bouton après l'animation
+          }, 2000); // 2 secondes pour l'animation CSS floatUpMini
+        }
+      )
+      .subscribe((status) => {
+        console.log("Statut de la connexion Realtime :", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentTicket?.numero_ticket]);
+
   const handleAppeler = async (ticket: Ticket) => {
     if (!userId) return;
 
@@ -466,6 +546,7 @@ export const AgentTicketManager: React.FC = () => {
             justifyContent: "center",
             alignItems: "center",
             height: "100%",
+            position: "relative",
           }}
         >
           {isLoadingGuichets ? (
@@ -530,7 +611,7 @@ export const AgentTicketManager: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="atm-main-container">
+          <div className="atm-main-container" style={{ position: "relative" }}>
             <header className="page-header">
               <div className="header-text">
                 <h1>Appel Tickets</h1>
@@ -682,28 +763,61 @@ export const AgentTicketManager: React.FC = () => {
                       </span>
                     </div>
 
-                    <button
-                      className="btn-terminer-mockup"
-                      onClick={() => handleTerminer(currentTicket)}
-                      disabled={isTerminerDisabled}
-                      style={{
-                        opacity: isTerminerDisabled ? 0.5 : 1,
-                        cursor: isTerminerDisabled ? "not-allowed" : "pointer",
-                        backgroundColor:
-                          needsSousService && !hasSelectedSousService
-                            ? "var(--text-disabled)"
-                            : "",
-                      }}
-                      title={
-                        isTerminerDisabled
-                          ? isTicketCalled
-                            ? "Veuillez sélectionner un sous-service"
-                            : "Veuillez cliquer sur 'Appeler' en premier"
-                          : ""
-                      }
-                    >
-                      <MdCheckCircle /> Terminer
-                    </button>
+                    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                      {persistentReaction && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            fontWeight: 700,
+                            animation: "ticketAppear 0.4s ease-out",
+                            background: "#f8fafc",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "12px",
+                            border: "1px solid #e2e8f0",
+                          }}
+                        >
+                          <span style={{ color: "#64748b", fontSize: "0.85rem", letterSpacing: "0.05em" }}>SC :</span>
+                          <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>{persistentReaction}</span>
+                        </div>
+                      )}
+
+                      <div className="reactions-container">
+                        {reactions.map((r) => (
+                          <div
+                            key={r.id}
+                            className="floating-emoji"
+                            style={{ left: `${r.left}%` }}
+                          >
+                            {r.emoji}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <button
+                        className="btn-terminer-mockup"
+                        onClick={() => handleTerminer(currentTicket)}
+                        disabled={isTerminerDisabled}
+                        style={{
+                          opacity: isTerminerDisabled ? 0.5 : 1,
+                          cursor: isTerminerDisabled ? "not-allowed" : "pointer",
+                          backgroundColor:
+                            needsSousService && !hasSelectedSousService
+                              ? "var(--text-disabled)"
+                              : "",
+                        }}
+                        title={
+                          isTerminerDisabled
+                            ? isTicketCalled
+                              ? "Veuillez sélectionner un sous-service"
+                              : "Veuillez cliquer sur 'Appeler' en premier"
+                            : ""
+                        }
+                      >
+                        <MdCheckCircle /> Terminer
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
