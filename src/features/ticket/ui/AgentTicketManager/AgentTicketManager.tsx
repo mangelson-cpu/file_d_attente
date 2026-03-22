@@ -393,19 +393,25 @@ export const AgentTicketManager: React.FC = () => {
         (payload) => {
           console.log("NOUVEAU VOTE/MISE A JOUR REÇU :", payload);
           
-          // Dans le payload("*"), la donnée est dans 'new' pour INSERT/UPDATE
-          if (!payload.new || payload.new.ticket_numero !== currentTicket.numero_ticket) {
+          if (!("new" in payload) || !payload.new) return;
+          
+          // Typage strict pour rassurer TypeScript lors d'un event="*" (Insert ou Update)
+          const newData = payload.new as { ticket_numero?: string; score?: number; id?: string };
+
+          if (newData.ticket_numero !== currentTicket.numero_ticket) {
             return;
           }
 
-          const score = payload.new.score;
+          const score = newData.score;
+          if (score === undefined) return;
+
           let emoji = "👍";
           if (score === 1) emoji = "😍";
           else if (score === 2) emoji = "😐";
           else if (score === 3) emoji = "😡";
 
           const newReaction = {
-            id: payload.new.id || Date.now().toString(),
+            id: newData.id || Date.now().toString(),
             emoji,
             left: 20 + Math.random() * 60, // random horizontal offset (20% to 80%)
           };
