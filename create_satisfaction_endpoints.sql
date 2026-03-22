@@ -1,14 +1,17 @@
 -- ==========================================
 -- ENDPOINTS API POUR TABLETTE SATISFACTION
 -- ==========================================
+-- 1. Table des évaluations (Une seule note finale par ticket)
+-- ==========================================
 
--- 1. Création de la table 'evaluations'
+-- Pour garantir qu'il n'y ait qu'un SEUL et UNIQUE vote par ticket,
+-- on supprime l'ancienne table si besoin, ou on s'assure que ticket_numero est UNIQUE.
 CREATE TABLE IF NOT EXISTS public.evaluations (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    ticket_numero VARCHAR NOT NULL,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     device_id VARCHAR NOT NULL,
+    ticket_numero VARCHAR NOT NULL UNIQUE,  -- UNIQUE empêche les doublons pour le même ticket
     score INT NOT NULL CHECK (score IN (1, 2, 3)),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- Activer RLS pour protéger les données
@@ -61,12 +64,17 @@ BEGIN
         RETURN json_build_object('success', false, 'error', 'Aucun ticket n''est actuellement "En cours" ("called") sur ce guichet.');
     END IF;
 
-    -- ÉTAPE B : Si un ticket a été trouvé, on enregistre immédiatement le vote dans 'evaluations'
+    -- ÉTAPE B : Si un ticket a été trouvé, on enregistre ou met à jour le vote dans 'evaluations' (UPSERT)
     INSERT INTO public.evaluations (ticket_numero, device_id, score)
-    VALUES (v_ticket_numero, p_device_id, p_score);
+    VALUES (v_ticket_numero, p_device_id, p_score)
+    ON CONFLICT (ticket_numero) 
+    DO UPDATE SET 
+        score = EXCLUDED.score,
+        device_id = EXCLUDED.device_id,
+        created_at = timezone('utc'::text, now());
 
     -- On renvoie un succès de la tablette, avec le numéro du ticket évalué pour info
-    RETURN json_build_object('success', true, 'ticket_numero', v_ticket_numero, 'message', 'Vote pris en compte avec succès.');
+    RETURN json_build_object('success', true, 'ticket_numero', v_ticket_numero, 'message', 'Vote pris en compte ou mis à jour avec succès.');
 EXCEPTION WHEN OTHERS THEN
     -- En cas d'erreur serveur inattendue
     RETURN json_build_object('success', false, 'error', SQLERRM);

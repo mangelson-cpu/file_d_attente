@@ -386,15 +386,15 @@ export const AgentTicketManager: React.FC = () => {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Écoute les INSERT ET les UPDATE
           schema: "public",
           table: "evaluations",
         },
         (payload) => {
-          console.log("NOUVEAU VOTE REÇU EN TEMPS RÉEL :", payload);
+          console.log("NOUVEAU VOTE/MISE A JOUR REÇU :", payload);
           
-          if (payload.new.ticket_numero !== currentTicket.numero_ticket) {
-            console.log("Ignoré: vote pour un autre ticket", payload.new.ticket_numero);
+          // Dans le payload("*"), la donnée est dans 'new' pour INSERT/UPDATE
+          if (!payload.new || payload.new.ticket_numero !== currentTicket.numero_ticket) {
             return;
           }
 
