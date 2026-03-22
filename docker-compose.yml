@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: file_d_attente_frontend
+    ports:
+      - "80:80"
+    restart: always
+    environment:
+      - NODE_ENV=production
