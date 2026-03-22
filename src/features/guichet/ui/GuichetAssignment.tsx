@@ -6,7 +6,6 @@ import type {
   Guichet,
   GuichetService,
   UserRole,
-  // User,
 } from "../../../shared/types";
 import "./GuichetAssignment.css";
 
@@ -15,7 +14,6 @@ interface Props {
   currentUserAgenceId: string | null;
 }
 
-
 export const GuichetAssignment: React.FC<Props> = ({
   userRole,
   currentUserAgenceId,
@@ -23,11 +21,10 @@ export const GuichetAssignment: React.FC<Props> = ({
   const [services, setServices] = useState<Service[]>([]);
   const [assignments, setAssignments] = useState<GuichetService[]>([]);
   const [guichets, setGuichets] = useState<Guichet[]>([]);
-  // const [agents, setAgents] = useState<User[]>([]);
+
   const [showModal, setShowModal] = useState(false);
   const [selectedGuichet, setSelectedGuichet] = useState("");
 
-  // État local pour le formulaire (checklist non encore enregistrée)
   const [localSelectedServices, setLocalSelectedServices] = useState<string[]>(
     [],
   );
@@ -38,7 +35,10 @@ export const GuichetAssignment: React.FC<Props> = ({
   const [fetchError, setFetchError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const { itemsPerPage, needsPagination } = useDynamicPageSize(tableContainerRef, guichets.length);
+  const { itemsPerPage, needsPagination } = useDynamicPageSize(
+    tableContainerRef,
+    guichets.length,
+  );
 
   const fetchData = useCallback(
     async (ignore: boolean = false) => {
@@ -86,14 +86,19 @@ export const GuichetAssignment: React.FC<Props> = ({
         );
         if (assignmentsError) throw assignmentsError;
 
-        console.log("GuichetAssignment: Appel de la table 'guichet' pour appellations");
+        console.log(
+          "GuichetAssignment: Appel de la table 'guichet' pour appellations",
+        );
         const { data: guichetData, error: guichetError } = await supabase
           .from("guichet")
           .select("*")
           .eq("agence_id", currentUserAgenceId);
 
         if (guichetError) {
-          console.warn("Erreur fetch guichet, peut-être table inexistante?", guichetError);
+          console.warn(
+            "Erreur fetch guichet, peut-être table inexistante?",
+            guichetError,
+          );
         }
 
         if (ignore) {
@@ -104,7 +109,7 @@ export const GuichetAssignment: React.FC<Props> = ({
         }
 
         if (servicesData) setServices(servicesData);
-        if (assignmentsData) setAssignments(assignmentsData as any);
+        if (assignmentsData) setAssignments(assignmentsData as GuichetService[]);
         if (guichetData) {
           const typedGuichets = guichetData as Guichet[];
           setGuichets(typedGuichets);
@@ -112,17 +117,18 @@ export const GuichetAssignment: React.FC<Props> = ({
             setSelectedGuichet(typedGuichets[0].nom_guichet);
           }
         }
-      } catch (err: any) {
+      } catch (err) {
         if (ignore) return;
-        console.error("Erreur fetchData:", err);
-        setFetchError(err.message || "Impossible de charger les données");
+        const error = err as Error;
+        console.error("Erreur fetchData:", error);
+        setFetchError(error.message || "Impossible de charger les données");
         setServices([]);
         setAssignments([]);
       } finally {
         if (!ignore) setLoading(false);
       }
     },
-    [currentUserAgenceId],
+    [currentUserAgenceId, selectedGuichet],
   );
 
   useEffect(() => {
@@ -139,7 +145,6 @@ export const GuichetAssignment: React.FC<Props> = ({
     };
   }, [fetchData]);
 
-  // Initialiser les services sélectionnés localement quand on change de guichet ou ouvre la modal
   useEffect(() => {
     if (showModal) {
       const alreadyAssigned = assignments
@@ -165,7 +170,6 @@ export const GuichetAssignment: React.FC<Props> = ({
     setMessage("");
 
     try {
-      // 1. Supprimer toutes les affectations existantes de services pour ce guichet
       const { error: deleteError } = await supabase
         .from("guichet_service")
         .delete()
@@ -174,7 +178,6 @@ export const GuichetAssignment: React.FC<Props> = ({
 
       if (deleteError) throw deleteError;
 
-      // 3. Insérer les nouvelles affectations si il y en a
       if (localSelectedServices.length > 0) {
         const newAssignments = localSelectedServices.map((serviceId) => ({
           nom_guichet: selectedGuichet,
@@ -197,19 +200,20 @@ export const GuichetAssignment: React.FC<Props> = ({
         setShowModal(false);
         setMessage("");
       }, 1500);
-    } catch (err: any) {
-      setMessage(err.message || "Erreur lors de l'enregistrement");
+    } catch (err) {
+      const error = err as Error;
+      setMessage(error.message || "Erreur lors de l'enregistrement");
       setIsSuccess(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // Grouper les affectations par guichet pour l'affichage du tableau
-  // On utilise uniquement les guichets configurés dans la table 'guichet'
   const groupedAssignments = guichets.map((gInfo) => {
     const opt = gInfo.nom_guichet;
-    const relevantAssignments = assignments.filter((a) => a.nom_guichet === opt);
+    const relevantAssignments = assignments.filter(
+      (a) => a.nom_guichet === opt,
+    );
     const agenceName = relevantAssignments[0]?.agence?.nom || "Votre Agence";
 
     return {
@@ -241,8 +245,9 @@ export const GuichetAssignment: React.FC<Props> = ({
 
       if (error) throw error;
       await fetchData();
-    } catch (err: any) {
-      alert(err.message || "Erreur lors de la suppression");
+    } catch (err) {
+      const error = err as Error;
+      alert(error.message || "Erreur lors de la suppression");
     } finally {
       setLoading(false);
     }
@@ -270,7 +275,9 @@ export const GuichetAssignment: React.FC<Props> = ({
               setSelectedGuichet(guichets[0].nom_guichet);
               setShowModal(true);
             } else {
-              alert("Veuillez d'abord configurer des guichets dans la page 'Gestion des Guichets'.");
+              alert(
+                "Veuillez d'abord configurer des guichets dans la page 'Gestion des Guichets'.",
+              );
             }
           }}
         >
@@ -278,7 +285,6 @@ export const GuichetAssignment: React.FC<Props> = ({
         </button>
       </header>
 
-      {/* Modal Overlay */}
       {showModal && (
         <div
           className="modal-overlay"
@@ -311,7 +317,8 @@ export const GuichetAssignment: React.FC<Props> = ({
                 >
                   {guichets.map((g) => (
                     <option key={g.id} value={g.nom_guichet}>
-                      {g.nom_guichet} {g.appellation ? `(${g.appellation})` : ""}
+                      {g.nom_guichet}{" "}
+                      {g.appellation ? `(${g.appellation})` : ""}
                     </option>
                   ))}
                 </select>
@@ -382,7 +389,6 @@ export const GuichetAssignment: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Summary Table */}
       <div className="content-card" ref={tableContainerRef}>
         {fetchError && (
           <div
@@ -409,79 +415,110 @@ export const GuichetAssignment: React.FC<Props> = ({
           <tbody>
             {groupedAssignments.length > 0 &&
               groupedAssignments
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .slice(
+                  (currentPage - 1) * itemsPerPage,
+                  currentPage * itemsPerPage,
+                )
                 .map((group) => (
-                <tr key={group.nom_guichet}>
-                  <td className="font-bold">
-                    {group.nom_guichet} {group.appellation ? `(${group.appellation})` : ""}
-                  </td>
-                  <td className="text-secondary">{group.agence_nom}</td>
-                  <td>
-                    <div className="service-tags-container">
-                      {group.services.map((s) => (
-                        <span key={s} className="status-badge user">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button
-                      className="icon-btn edit"
-                      onClick={() => {
-                        setSelectedGuichet(group.nom_guichet);
-                        setShowModal(true);
-                      }}
-                      title="Modifier les services"
-                      disabled={loading}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                  <tr key={group.nom_guichet}>
+                    <td className="font-bold">
+                      {group.nom_guichet}{" "}
+                      {group.appellation ? `(${group.appellation})` : ""}
+                    </td>
+                    <td className="text-secondary">{group.agence_nom}</td>
+                    <td>
+                      <div className="service-tags-container">
+                        {group.services.map((s) => (
+                          <span key={s} className="status-badge user">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        className="icon-btn edit"
+                        onClick={() => {
+                          setSelectedGuichet(group.nom_guichet);
+                          setShowModal(true);
+                        }}
+                        title="Modifier les services"
+                        disabled={loading}
                       >
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                    </button>
-                    <button
-                      className="icon-btn delete"
-                      onClick={() =>
-                        handleDeleteAllForGuichet(group.nom_guichet)
-                      }
-                      title="Supprimer toutes les affectations"
-                      disabled={loading}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        className="icon-btn delete"
+                        onClick={() =>
+                          handleDeleteAllForGuichet(group.nom_guichet)
+                        }
+                        title="Supprimer toutes les affectations"
+                        disabled={loading}
                       >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
           </tbody>
         </table>
         {needsPagination && (
           <div className="pagination-controls">
-            <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>←</button>
-            {Array.from({ length: Math.ceil(groupedAssignments.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
-              <button key={page} className={`pagination-btn ${currentPage === page ? 'active' : ''}`} onClick={() => setCurrentPage(page)}>{page}</button>
+            <button
+              className="pagination-btn"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              ←
+            </button>
+            {Array.from(
+              { length: Math.ceil(groupedAssignments.length / itemsPerPage) },
+              (_, i) => i + 1,
+            ).map((page) => (
+              <button
+                key={page}
+                className={`pagination-btn ${currentPage === page ? "active" : ""}`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
             ))}
-            <button className="pagination-btn" disabled={currentPage === Math.ceil(groupedAssignments.length / itemsPerPage)} onClick={() => setCurrentPage(p => p + 1)}>→</button>
-            <span className="pagination-info">{groupedAssignments.length} guichet{groupedAssignments.length > 1 ? 's' : ''}</span>
+            <button
+              className="pagination-btn"
+              disabled={
+                currentPage ===
+                Math.ceil(groupedAssignments.length / itemsPerPage)
+              }
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              →
+            </button>
+            <span className="pagination-info">
+              {groupedAssignments.length} guichet
+              {groupedAssignments.length > 1 ? "s" : ""}
+            </span>
           </div>
         )}
       </div>

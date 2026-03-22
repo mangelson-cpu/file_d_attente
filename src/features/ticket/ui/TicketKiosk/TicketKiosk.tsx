@@ -15,8 +15,6 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeAgenceId, setActiveAgenceId] = useState<string | null>(() => {
-    // const stored = localStorage.getItem("kiosk_agence_id");
-    //return userAgenceId || stored || null;
     return userAgenceId || null;
   });
   const navigate = useNavigate();
@@ -24,7 +22,6 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
   useEffect(() => {
     if (userAgenceId) {
       setActiveAgenceId(userAgenceId);
-      //localStorage.setItem("kiosk_agence_id", userAgenceId);
     }
   }, [userAgenceId]);
 
@@ -33,13 +30,13 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Écouteur pour le plein écran
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
   const toggleFullscreen = () => {
@@ -65,7 +62,6 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
     }
 
     try {
-      // 1. Récupérer les infos de l'agence
       const { data: agenceData, error: agenceError } = await supabase
         .from("agence")
         .select("*")
@@ -79,7 +75,6 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
         setAgence(agenceData);
       }
 
-      // 2. Récupérer les services assignés aux guichets de cette agence
       console.log(
         "TicketKiosk: Fetching guichet_service for agence:",
         activeAgenceId,
@@ -104,11 +99,12 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
         guichetServices?.length || 0,
       );
 
-      // Extraire les services uniques
       const uniqueServicesMap = new Map();
-      guichetServices?.forEach((item: any) => {
-        if (item.service && !uniqueServicesMap.has(item.service.id)) {
-          uniqueServicesMap.set(item.service.id, item.service);
+      guichetServices?.forEach((item: unknown) => {
+        const row = item as { service: Service | Service[] | null };
+        const srv = Array.isArray(row.service) ? row.service[0] : row.service;
+        if (srv && !uniqueServicesMap.has(srv.id)) {
+          uniqueServicesMap.set(srv.id, srv);
         }
       });
 
@@ -125,7 +121,6 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
   useEffect(() => {
     fetchData();
 
-    // 3. Temps réel : S'abonner aux changements des affectations
     const channel = supabase
       .channel("kiosk-updates")
       .on(
@@ -157,13 +152,12 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
         serviceId: service.id,
         serviceName: service.nom_service,
         agenceId: activeAgenceId,
-        agenceName: agence?.nom,  // Nom de l'agence pour l'impression du ticket
+        agenceName: agence?.nom,
       },
     });
   };
 
   const getServiceIcon = (serviceName: string) => {
-    // Fallback icons based on name
     const name = serviceName.toLowerCase();
     if (name.includes("dépôt") || name.includes("depot")) {
       return (
@@ -218,7 +212,7 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
         </svg>
       );
     }
-    // Generic icon for others
+
     return (
       <svg
         viewBox="0 0 24 24"
@@ -269,19 +263,34 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
       <div className="kiosk-bg-decorator shape-2"></div>
       <div className="kiosk-bg-decorator shape-3"></div>
 
-      {/* Bouton Plein Écran Discret */}
-      <button 
-        className="kiosk-fullscreen-btn" 
+      <button
+        className="kiosk-fullscreen-btn"
         onClick={toggleFullscreen}
-        title={isFullscreen ? "Quitter le plein écran" : "Passer en plein écran"}
+        title={
+          isFullscreen ? "Quitter le plein écran" : "Passer en plein écran"
+        }
       >
         {isFullscreen ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
           </svg>
         )}
       </button>

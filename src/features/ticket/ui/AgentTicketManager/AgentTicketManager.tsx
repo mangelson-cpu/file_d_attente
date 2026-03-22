@@ -27,7 +27,6 @@ export const AgentTicketManager: React.FC = () => {
   const [activeGuichets, setActiveGuichets] = useState<string[]>([]);
   const [isLoadingGuichets, setIsLoadingGuichets] = useState(true);
 
-  // Sous-services logic
   const [currentSousServices, setCurrentSousServices] = useState<SousService[]>(
     [],
   );
@@ -37,7 +36,6 @@ export const AgentTicketManager: React.FC = () => {
   const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
-    // Prepare global channel for manually broadcasting "rappel" to the dashboard
     broadcastChannelRef.current = supabase.channel("public_dashboard_tickets");
     broadcastChannelRef.current.subscribe();
 
@@ -48,7 +46,6 @@ export const AgentTicketManager: React.FC = () => {
     };
   }, []);
 
-  // Fonction pour libérer le guichet actuel
   const releaseGuichet = async (agentId: string) => {
     try {
       await supabase.from("active_guichets").delete().eq("user_id", agentId);
@@ -65,7 +62,6 @@ export const AgentTicketManager: React.FC = () => {
       if (user) {
         setUserId(user.id);
 
-        // Fetch agent name & agence_id
         const { data: userData } = await supabase
           .from("users")
           .select("nom_user, agence_id")
@@ -78,7 +74,7 @@ export const AgentTicketManager: React.FC = () => {
 
           if (userData.agence_id) {
             setIsLoadingGuichets(true);
-            // Fetch custom appellations
+
             const { data: appData } = await supabase
               .from("guichet")
               .select("nom_guichet, appellation")
@@ -94,7 +90,6 @@ export const AgentTicketManager: React.FC = () => {
               setGuichetAppellations(mapping);
             }
 
-            // Fetch currently active/taken guichets
             const { data: activeData } = await supabase
               .from("active_guichets")
               .select("nom_guichet, user_id")
@@ -109,7 +104,6 @@ export const AgentTicketManager: React.FC = () => {
             if (activeData) {
               setActiveGuichets(activeData.map((a) => a.nom_guichet));
 
-              // Auto-reconnect current user to their guichet if applicable
               const myActiveGuichet = activeData.find(
                 (a) => a.user_id === user.id,
               );
@@ -124,7 +118,6 @@ export const AgentTicketManager: React.FC = () => {
                   setGuichetName(myActiveGuichet.nom_guichet);
                   setGuichetServices(servicesData.map((s) => s.service_id));
                 } else {
-                  // Invalid state, release it
                   releaseGuichet(user.id);
                   setActiveGuichets((prev) =>
                     prev.filter((g) => g !== myActiveGuichet.nom_guichet),
@@ -133,24 +126,18 @@ export const AgentTicketManager: React.FC = () => {
               }
             }
           }
-          // Fin du chargement peu importe le résultat (même s'il n'y a pas d'agence_id)
+
           setIsLoadingGuichets(false);
         } else {
-          // Fin du chargement si l'utilisateur n'a pas pu être récupéré
           setIsLoadingGuichets(false);
         }
       } else {
-        // Fin du chargement si pas d'utilisateur connecté
         setIsLoadingGuichets(false);
       }
     };
     fetchUserAndGuichets();
-
-    // Suppression du nettoyage automatique pour permettre la navigation :
-    // l'agent ne sera déconnecté du guichet que s'il clique explicitement sur "(Quitter)"
   }, []);
 
-  // Souscription temps réel aux changements de guichets (refresh la liste des guichets pris)
   useEffect(() => {
     if (!userAgenceId) return;
 
@@ -162,12 +149,8 @@ export const AgentTicketManager: React.FC = () => {
           event: "*",
           schema: "public",
           table: "active_guichets",
-          // On enlève le filtre agence_id car lors d'un DELETE,
-          // Supabase n'envoie pas toujours les colonnes (Replica Identity par défaut),
-          // ce qui fait que le filtre ignorait l'évènement de libération.
         },
         async () => {
-          // Refresh active guichets list
           const { data } = await supabase
             .from("active_guichets")
             .select("nom_guichet")
@@ -188,10 +171,8 @@ export const AgentTicketManager: React.FC = () => {
   const handleSelectGuichet = async (selectedName: string) => {
     if (!userAgenceId || !userId) return;
 
-    // Optimisation de l'UI : On le marque comme pris immédiatement
     setActiveGuichets((prev) => [...prev, selectedName]);
 
-    // 1. Tenter de s'enregistrer sur le guichet
     const { error: lockError } = await supabase.from("active_guichets").insert({
       nom_guichet: selectedName,
       agence_id: userAgenceId,
@@ -206,7 +187,6 @@ export const AgentTicketManager: React.FC = () => {
       return;
     }
 
-    // 2. Fetch services for selected guichet
     const { data: servicesData } = await supabase
       .from("guichet_service")
       .select("service_id")
@@ -220,14 +200,13 @@ export const AgentTicketManager: React.FC = () => {
       console.warn("Aucun service trouvé pour ce guichet");
       setGuichetServices([]);
       releaseGuichet(userId);
-      setActiveGuichets((prev) => prev.filter((g) => g !== selectedName)); // Rollback si pas de service
+      setActiveGuichets((prev) => prev.filter((g) => g !== selectedName));
     }
   };
 
   const handleLeaveGuichet = async () => {
     if (!userId) return;
 
-    // Optimisation de l'UI : on libère localement de suite pour éviter de voir "Occupé" au retour
     if (guichetName) {
       setActiveGuichets((prev) => prev.filter((g) => g !== guichetName));
     }
@@ -243,7 +222,6 @@ export const AgentTicketManager: React.FC = () => {
       setAgentStatus("pret");
       setIsSearching(true);
 
-      // Find first waiting ticket to make it "ready"
       const waitingTicket = tickets.find((t) => t.status === "waiting");
       if (waitingTicket && userId) {
         const { error } = await supabase
@@ -254,7 +232,7 @@ export const AgentTicketManager: React.FC = () => {
             nom_guichet: guichetName,
           })
           .eq("id", waitingTicket.id)
-          .eq("status", "waiting"); // Extra safety check
+          .eq("status", "waiting");
 
         if (!error) {
           setTickets((prev) =>
@@ -316,7 +294,6 @@ export const AgentTicketManager: React.FC = () => {
     };
     fetchTickets();
 
-    // Real-time subscription
     const channel = supabase
       .channel("ticket_changes")
       .on(
@@ -348,6 +325,7 @@ export const AgentTicketManager: React.FC = () => {
 
   useEffect(() => {
     const loadSousServicesForCurrentTicket = async () => {
+      setSelectedSousServiceId("");
       if (currentTicket && currentTicket.service_id) {
         const { data, error } = await supabase
           .from("sous_service")
@@ -366,9 +344,7 @@ export const AgentTicketManager: React.FC = () => {
     };
 
     loadSousServicesForCurrentTicket();
-    // Force la réinitialisation du choix à chaque NOUVEAU ticket
-    setSelectedSousServiceId("");
-  }, [currentTicket?.id, currentTicket?.service_id]);
+  }, [currentTicket]);
 
   const handleAppeler = async (ticket: Ticket) => {
     if (!userId) return;
@@ -434,7 +410,6 @@ export const AgentTicketManager: React.FC = () => {
   };
 
   const handleTerminer = async (ticket: Ticket) => {
-    // Enforce sous-service selection if there are sous-services available
     if (currentSousServices.length > 0 && !selectedSousServiceId) {
       alert("Veuillez choisir un sous-service avant de terminer ce ticket.");
       return;
@@ -451,7 +426,6 @@ export const AgentTicketManager: React.FC = () => {
         date_fin: dateFin,
       };
 
-      // Fallback si l'agent a cliqué sur 'Terminer' sans jamais cliquer sur 'Appeler'
       if (!ticket.date_debut) {
         updatePayload.date_debut = dateFin;
       }
@@ -474,19 +448,16 @@ export const AgentTicketManager: React.FC = () => {
     }, 500);
   };
 
-  // Computations claires pour l'état du bouton "Terminer"
   const isTicketCalled = currentTicket?.status === "called";
   const needsSousService = currentSousServices.length > 0;
   const hasSelectedSousService = selectedSousServiceId !== "";
 
-  // Le bouton peut terminer SI le ticket est appelé ET (s'il n'y a pas de sous-service requis OU s'il y en a un sélectionné)
   const canTerminate =
     isTicketCalled && (!needsSousService || hasSelectedSousService);
   const isTerminerDisabled = !canTerminate;
 
   return (
     <div className="agent-ticket-manager">
-      {/* Si aucun guichet n'est sélectionné, on affiche l'écran de sélection */}
       {!guichetName ? (
         <div
           className="atm-main-container"
@@ -644,7 +615,6 @@ export const AgentTicketManager: React.FC = () => {
                           <MdSkipNext /> Ignorer
                         </button>
 
-                        {/* Sélection du sous-service */}
                         {currentSousServices.length > 0 &&
                           (currentTicket.status === "called" ||
                             currentTicket.status === "ready") && (
@@ -748,7 +718,6 @@ export const AgentTicketManager: React.FC = () => {
             </div>
           </div>
 
-          {/* ---- Status Footer ---- */}
           <div className="atm-status-footer">
             <div className="status-footer-content">
               <span className="status-label">Statut :</span>

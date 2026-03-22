@@ -17,8 +17,6 @@ import { AgencePage } from "./pages/Agences";
 import { TicketsListPage } from "./pages/TicketsList";
 import { GuichetPage } from "./pages/Guichets";
 
-
-// Loading Component
 const LoadingOverlay = ({ message }: { message: string }) => (
   <div className="global-loading-overlay">
     <div className="loader-spinner"></div>
@@ -41,7 +39,9 @@ function App() {
       try {
         const { data } = await supabase.from("agence").select("*");
         setAgences(data ?? []);
-      } catch { }
+      } catch (err) {
+        console.error("Erreur fetchAgences:", err);
+      }
     };
 
     const loadProfile = async (userId: string) => {
@@ -125,7 +125,6 @@ function App() {
       localStorage.clear();
       sessionStorage.clear();
 
-      // Force reload to completely wipe memory state
       window.location.replace("/login");
     }
   };
@@ -140,7 +139,6 @@ function App() {
 
       <BrowserRouter>
         <Routes>
-          {/* Public Kiosk Routes */}
           <Route
             path="/ticket"
             element={<KioskPage userAgenceId={userAgenceId} />}
@@ -148,19 +146,16 @@ function App() {
           <Route path="/ticket/priority" element={<PriorityPage />} />
           <Route path="/ticket/done" element={<DonePage />} />
 
-          {/* Public Dashboard Route */}
           <Route
             path="/public-dashboard"
             element={<PublicDashboardPage userAgenceId={userAgenceId} />}
           />
 
-          {/* Dynamic Public Routes (Agence specific) */}
           <Route path="/:slug/borne" element={<KioskPage />} />
           <Route path="/:slug/borne/priority" element={<PriorityPage />} />
           <Route path="/:slug/borne/done" element={<DonePage />} />
           <Route path="/:slug/screen" element={<PublicDashboardPage />} />
 
-          {/* Authenticated Routes */}
           {userRole ? (
             <Route
               element={
@@ -210,7 +205,6 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           ) : (
-            /* Unauthenticated Routes */
             <>
               <Route
                 path="/login"

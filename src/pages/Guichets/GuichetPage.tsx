@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../shared/api/supabaseClient";
 import type { Guichet, UserRole } from "../../shared/types";
-import "./GuichetPage.css"; // We'll create a basic css file or reuse styles
+import "./GuichetPage.css";
 
 interface Props {
   userRole: UserRole;
@@ -22,14 +22,16 @@ export const GuichetPage: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  // Modal State
   const [selectedGuichet, setSelectedGuichet] = useState(GUICHET_OPTIONS[0]);
   const [appellation, setAppellation] = useState("");
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const { itemsPerPage, needsPagination } = useDynamicPageSize(tableContainerRef, GUICHET_OPTIONS.length);
+  const { itemsPerPage, needsPagination } = useDynamicPageSize(
+    tableContainerRef,
+    GUICHET_OPTIONS.length,
+  );
 
   const fetchGuichets = useCallback(async () => {
     if (!currentUserAgenceId) return;
@@ -43,10 +45,10 @@ export const GuichetPage: React.FC<Props> = ({
 
       if (error) throw error;
       setGuichets(data as Guichet[]);
-    } catch (err: any) {
+    } catch (err) {
       console.error(
         "Erreur lors de la récupération des guichets:",
-        err.message,
+        (err as Error).message,
       );
     } finally {
       setLoading(false);
@@ -74,28 +76,24 @@ export const GuichetPage: React.FC<Props> = ({
 
     try {
       if (appellation.trim() === "") {
-        const { error } = await supabase
-          .from("guichet")
-          .upsert(
-            {
-              nom_guichet: selectedGuichet,
-              appellation: null,
-              agence_id: currentUserAgenceId,
-            },
-            { onConflict: "nom_guichet, agence_id" },
-          );
+        const { error } = await supabase.from("guichet").upsert(
+          {
+            nom_guichet: selectedGuichet,
+            appellation: null,
+            agence_id: currentUserAgenceId,
+          },
+          { onConflict: "nom_guichet, agence_id" },
+        );
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("guichet")
-          .upsert(
-            {
-              nom_guichet: selectedGuichet,
-              appellation: appellation.trim(),
-              agence_id: currentUserAgenceId,
-            },
-            { onConflict: "nom_guichet, agence_id" },
-          );
+        const { error } = await supabase.from("guichet").upsert(
+          {
+            nom_guichet: selectedGuichet,
+            appellation: appellation.trim(),
+            agence_id: currentUserAgenceId,
+          },
+          { onConflict: "nom_guichet, agence_id" },
+        );
         if (error) throw error;
       }
 
@@ -107,9 +105,9 @@ export const GuichetPage: React.FC<Props> = ({
         setShowModal(false);
         setMessage("");
       }, 1500);
-    } catch (err: any) {
+    } catch (err) {
       setIsSuccess(false);
-      setMessage(err.message || "Erreur lors de l'enregistrement");
+      setMessage((err as Error).message || "Erreur lors de l'enregistrement");
     } finally {
       setLoading(false);
     }
@@ -134,8 +132,8 @@ export const GuichetPage: React.FC<Props> = ({
 
       if (error) throw error;
       await fetchGuichets();
-    } catch (err: any) {
-      alert("Erreur: " + err.message);
+    } catch (err) {
+      alert("Erreur: " + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -145,7 +143,6 @@ export const GuichetPage: React.FC<Props> = ({
     return <div className="auth-permission-denied">Accès non autorisé</div>;
   }
 
-  // Fusionner la configuration DB avec les 20 options par défaut pour tout afficher
   const allGuichetsDisplay = GUICHET_OPTIONS.map((opt) => {
     const dbGuichet = guichets.find((g) => g.nom_guichet === opt);
     return {

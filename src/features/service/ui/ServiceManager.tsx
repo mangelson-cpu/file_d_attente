@@ -22,7 +22,10 @@ export const ServiceManager: React.FC<Props> = ({ userRole }) => {
   const [fetchError, setFetchError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const { itemsPerPage, needsPagination } = useDynamicPageSize(tableContainerRef, services.length);
+  const { itemsPerPage, needsPagination } = useDynamicPageSize(
+    tableContainerRef,
+    services.length,
+  );
 
   const isSuperAdmin = userRole === "super_admin";
 
@@ -45,10 +48,11 @@ export const ServiceManager: React.FC<Props> = ({ userRole }) => {
         setServices(data as Service[]);
         setCurrentPage(1);
       }
-    } catch (err: any) {
+    } catch (err) {
       if (ignore) return;
-      console.error("Erreur lors de la récupération des services:", err);
-      setFetchError(err.message || "Impossible de charger les services");
+      const error = err as Error;
+      console.error("Erreur lors de la récupération des services:", error);
+      setFetchError(error.message || "Impossible de charger les services");
       setServices([]);
     }
   }, []);
@@ -117,9 +121,10 @@ export const ServiceManager: React.FC<Props> = ({ userRole }) => {
       }, 1000);
 
       await fetchServices();
-    } catch (err: any) {
-      console.error("Erreur handleSubmit:", err);
-      setMessage(err.message || "Erreur lors de l'opération");
+    } catch (err) {
+      const error = err as Error;
+      console.error("Erreur handleSubmit:", error);
+      setMessage(error.message || "Erreur lors de l'opération");
       setIsSuccess(false);
     } finally {
       setLoading(false);
@@ -133,9 +138,10 @@ export const ServiceManager: React.FC<Props> = ({ userRole }) => {
       const { error } = await supabase.from("service").delete().eq("id", id);
       if (error) throw error;
       await fetchServices();
-    } catch (err: any) {
-      console.error("Erreur delette:", err);
-      alert(err.message || "Erreur lors de la suppression");
+    } catch (err) {
+      const error = err as Error;
+      console.error("Erreur delette:", error);
+      alert(error.message || "Erreur lors de la suppression");
     }
   };
 

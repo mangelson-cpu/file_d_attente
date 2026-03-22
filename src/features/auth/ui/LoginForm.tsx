@@ -30,12 +30,14 @@ export const LoginForm: React.FC<Props> = ({ onLogin }) => {
         throw new Error(
           error.message === "Invalid login credentials"
             ? "Email ou mot de passe incorrect"
-            : error.message
+            : error.message,
         );
       }
 
-      // Attendre que le token soit bien propagé avant de fetch le profil
-      const fetchProfile = async (userId: string, retries = 5): Promise<{ role: string | null; error: any }> => {
+      const fetchProfile = async (
+        userId: string,
+        retries = 5,
+      ): Promise<{ role: string | null; error: unknown }> => {
         let lastError = null;
         for (let i = 0; i < retries; i++) {
           const { data: profile, error: profileError } = await supabase
@@ -49,11 +51,13 @@ export const LoginForm: React.FC<Props> = ({ onLogin }) => {
           }
 
           lastError = profileError;
-          console.warn(`Tentative de chargement du profil ${i + 1}/${retries} échouée...`, profileError);
+          console.warn(
+            `Tentative de chargement du profil ${i + 1}/${retries} échouée...`,
+            profileError,
+          );
 
-          // Attendre 500ms avant de réessayer
           if (i < retries - 1) {
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise((resolve) => setTimeout(resolve, 800));
           }
         }
         return { role: null, error: lastError };
@@ -62,11 +66,15 @@ export const LoginForm: React.FC<Props> = ({ onLogin }) => {
       const { role, error: fetchError } = await fetchProfile(data.user.id);
 
       if (!role) {
-        console.error("Erreur fatale lors de la récupération du profil:", fetchError);
+        console.error(
+          "Erreur fatale lors de la récupération du profil:",
+          fetchError,
+        );
+        const typedError = fetchError as { code?: string, message?: string };
         throw new Error(
-          fetchError?.code === "PGRST116"
+          typedError?.code === "PGRST116"
             ? "Profil introuvable dans la table 'users'."
-            : `Erreur de permission (RLS) : ${fetchError?.message || "Inconnue"}. Vérifiez vos politiques Supabase.`
+            : `Erreur de permission (RLS) : ${typedError?.message || "Inconnue"}. Vérifiez vos politiques Supabase.`,
         );
       }
 
