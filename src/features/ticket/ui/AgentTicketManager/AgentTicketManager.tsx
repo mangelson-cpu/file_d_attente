@@ -33,8 +33,12 @@ export const AgentTicketManager: React.FC = () => {
   const [selectedSousServiceId, setSelectedSousServiceId] =
     useState<string>("");
 
-  const [reactions, setReactions] = useState<{ id: string; emoji: string; left: number }[]>([]);
-  const [persistentReaction, setPersistentReaction] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<
+    { id: string; emoji: string; left: number }[]
+  >([]);
+  const [persistentReaction, setPersistentReaction] = useState<string | null>(
+    null,
+  );
 
   const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
 
@@ -364,10 +368,8 @@ export const AgentTicketManager: React.FC = () => {
 
         if (data) {
           const score = data.score;
-          let emoji = "👍";
-          if (score === 1) emoji = "😍";
-          else if (score === 2) emoji = "😐";
-          else if (score === 3) emoji = "😡";
+          let emoji = "✅";
+          if (score) emoji;
           setPersistentReaction(emoji);
         }
       };
@@ -379,24 +381,30 @@ export const AgentTicketManager: React.FC = () => {
   useEffect(() => {
     if (!currentTicket?.numero_ticket) return;
 
-    console.log("Abonnement Realtime activé pour le ticket:", currentTicket.numero_ticket);
+    console.log(
+      "Abonnement Realtime activé pour le ticket:",
+      currentTicket.numero_ticket,
+    );
 
     const channel = supabase
       .channel(`evaluations_${currentTicket.numero_ticket}`)
       .on(
         "postgres_changes",
         {
-          event: "*", // Écoute les INSERT ET les UPDATE
+          event: "*",
           schema: "public",
           table: "evaluations",
         },
         (payload) => {
           console.log("NOUVEAU VOTE/MISE A JOUR REÇU :", payload);
-          
+
           if (!("new" in payload) || !payload.new) return;
-          
-          // Typage strict pour rassurer TypeScript lors d'un event="*" (Insert ou Update)
-          const newData = payload.new as { ticket_numero?: string; score?: number; id?: string };
+
+          const newData = payload.new as {
+            ticket_numero?: string;
+            score?: number;
+            id?: string;
+          };
 
           if (newData.ticket_numero !== currentTicket.numero_ticket) {
             return;
@@ -405,23 +413,21 @@ export const AgentTicketManager: React.FC = () => {
           const score = newData.score;
           if (score === undefined) return;
 
-          let emoji = "👍";
-          if (score === 1) emoji = "😍";
-          else if (score === 2) emoji = "😐";
-          else if (score === 3) emoji = "😡";
+          let emoji = "✅";
+          if (score) emoji;
 
           const newReaction = {
             id: newData.id || Date.now().toString(),
             emoji,
-            left: 20 + Math.random() * 60, // random horizontal offset (20% to 80%)
+            left: 20 + Math.random() * 60,
           };
           setReactions((prev) => [...prev, newReaction]);
 
           setTimeout(() => {
             setReactions((prev) => prev.filter((r) => r.id !== newReaction.id));
-            setPersistentReaction(emoji); // Fixer l'emoji à côté du bouton après l'animation
-          }, 2000); // 2 secondes pour l'animation CSS floatUpMini
-        }
+            setPersistentReaction(emoji);
+          }, 2000);
+        },
       )
       .subscribe((status) => {
         console.log("Statut de la connexion Realtime :", status);
@@ -769,7 +775,14 @@ export const AgentTicketManager: React.FC = () => {
                       </span>
                     </div>
 
-                    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                    <div
+                      style={{
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "1.5rem",
+                      }}
+                    >
                       {persistentReaction && (
                         <div
                           style={{
@@ -784,8 +797,18 @@ export const AgentTicketManager: React.FC = () => {
                             border: "1px solid #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "#64748b", fontSize: "0.85rem", letterSpacing: "0.05em" }}>SC :</span>
-                          <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>{persistentReaction}</span>
+                          <span
+                            style={{
+                              color: "#64748b",
+                              fontSize: "0.85rem",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            SC :
+                          </span>
+                          <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>
+                            {persistentReaction}
+                          </span>
                         </div>
                       )}
 
@@ -800,14 +823,16 @@ export const AgentTicketManager: React.FC = () => {
                           </div>
                         ))}
                       </div>
-                      
+
                       <button
                         className="btn-terminer-mockup"
                         onClick={() => handleTerminer(currentTicket)}
                         disabled={isTerminerDisabled}
                         style={{
                           opacity: isTerminerDisabled ? 0.5 : 1,
-                          cursor: isTerminerDisabled ? "not-allowed" : "pointer",
+                          cursor: isTerminerDisabled
+                            ? "not-allowed"
+                            : "pointer",
                           backgroundColor:
                             needsSousService && !hasSelectedSousService
                               ? "var(--text-disabled)"
