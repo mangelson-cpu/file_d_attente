@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { MdPhone, MdSkipNext, MdCheckCircle } from "react-icons/md";
 import { TbDatabaseOff } from "react-icons/tb";
 import { FaCoffee } from "react-icons/fa";
@@ -224,12 +224,33 @@ export const AgentTicketManager: React.FC = () => {
     setGuichetServices([]);
   };
 
+  const fetchTickets = useCallback(async () => {
+    if (guichetServices.length === 0) return [];
+    
+    const { data: dataTicket, error: dataError } = await supabase
+      .from("ticket")
+      .select("*, service(nom_service)")
+      .in("status", ["waiting", "ready", "called"])
+      .in("service_id", guichetServices)
+      .order("created_at", { ascending: true });
+
+    if (dataTicket) {
+      const sorted = sortByPriority(dataTicket as Ticket[]);
+      setTickets(sorted);
+      return sorted;
+    } else if (dataError) {
+      console.error("Erreur lors de la récupération des tickets:", dataError);
+    }
+    return [];
+  }, [guichetServices]);
+
   const handleStatusChange = async (newStatus: "pret" | "pause") => {
     if (newStatus === "pret" && agentStatus === "pause") {
       setAgentStatus("pret");
       setIsSearching(true);
 
-      const waitingTicket = tickets.find((t) => t.status === "waiting");
+      const freshTickets = await fetchTickets();
+      const waitingTicket = freshTickets.find((t) => t.status === "waiting");
       if (waitingTicket && userId) {
         const { error } = await supabase
           .from("ticket")
@@ -246,11 +267,11 @@ export const AgentTicketManager: React.FC = () => {
             prev.map((t) =>
               t.id === waitingTicket.id
                 ? {
-                    ...t,
-                    status: "ready" as const,
-                    user_id: userId,
-                    nom_guichet: guichetName,
-                  }
+                  ...t,
+                  status: "ready" as const,
+                  user_id: userId,
+                  nom_guichet: guichetName,
+                }
                 : t,
             ),
           );
@@ -285,20 +306,6 @@ export const AgentTicketManager: React.FC = () => {
   useEffect(() => {
     if (guichetServices.length === 0) return;
 
-    const fetchTickets = async () => {
-      const { data: dataTicket, error: dataError } = await supabase
-        .from("ticket")
-        .select("*, service(nom_service)")
-        .in("status", ["waiting", "ready", "called"])
-        .in("service_id", guichetServices)
-        .order("created_at", { ascending: true });
-
-      if (dataTicket) {
-        setTickets(sortByPriority(dataTicket as Ticket[]));
-      } else if (dataError) {
-        console.error("Erreur lors de la récupération des tickets:", dataError);
-      }
-    };
     fetchTickets();
 
     const channel = supabase
@@ -320,7 +327,7 @@ export const AgentTicketManager: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [guichetServices]);
+  }, [guichetServices, fetchTickets]);
 
   const activeTicket = tickets.find(
     (t) =>
@@ -466,9 +473,9 @@ export const AgentTicketManager: React.FC = () => {
           prev.map((t) =>
             t.id === ticket.id
               ? {
-                  ...t,
-                  ...updatePayload,
-                }
+                ...t,
+                ...updatePayload,
+              }
               : t,
           ),
         );
@@ -508,11 +515,6 @@ export const AgentTicketManager: React.FC = () => {
   };
 
   const handleTerminer = async (ticket: Ticket) => {
-    if (currentSousServices.length > 0 && !selectedSousServiceId) {
-      alert("Veuillez choisir un sous-service avant de terminer ce ticket.");
-      return;
-    }
-
     setExitType("done");
     setAnimatingOutId(ticket.id);
 
@@ -547,12 +549,9 @@ export const AgentTicketManager: React.FC = () => {
   };
 
   const isTicketCalled = currentTicket?.status === "called";
-  const needsSousService = currentSousServices.length > 0;
-  const hasSelectedSousService = selectedSousServiceId !== "";
 
-  const canTerminate =
-    isTicketCalled && (!needsSousService || hasSelectedSousService);
-  const isTerminerDisabled = !canTerminate;
+  const isTerminerDisabled = !isTicketCalled;
+  const isIgnorerDisabled = !isTicketCalled;
 
   return (
     <div className="agent-ticket-manager">
@@ -710,6 +709,11 @@ export const AgentTicketManager: React.FC = () => {
                         <button
                           className="action-btn-small btn-ignore"
                           onClick={() => handleIgnorer(currentTicket)}
+                          disabled={isIgnorerDisabled}
+                          style={{
+                            opacity: isIgnorerDisabled ? 0.5 : 1,
+                            cursor: isIgnorerDisabled ? "not-allowed" : "pointer",
+                          }}
                         >
                           <MdSkipNext /> Ignorer
                         </button>
@@ -839,16 +843,10 @@ export const AgentTicketManager: React.FC = () => {
                           cursor: isTerminerDisabled
                             ? "not-allowed"
                             : "pointer",
-                          backgroundColor:
-                            needsSousService && !hasSelectedSousService
-                              ? "var(--text-disabled)"
-                              : "",
                         }}
                         title={
                           isTerminerDisabled
-                            ? isTicketCalled
-                              ? "Veuillez sélectionner un sous-service"
-                              : "Veuillez cliquer sur 'Appeler' en premier"
+                            ? "Veuillez cliquer sur 'Appeler' en premier"
                             : ""
                         }
                       >
