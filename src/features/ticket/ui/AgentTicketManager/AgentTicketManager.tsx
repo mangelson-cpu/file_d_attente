@@ -368,8 +368,14 @@ export const AgentTicketManager: React.FC = () => {
 
         if (data) {
           const score = data.score;
+
           let emoji = "✅";
           if (score) emoji;
+
+          //let emoji = "👍";
+          //if (score === 1) emoji = "😍";
+          //else if (score === 2) emoji = "😐";
+          //else if (score === 3) emoji = "😡";
           setPersistentReaction(emoji);
         }
       };
