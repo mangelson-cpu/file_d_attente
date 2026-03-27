@@ -16,6 +16,8 @@ export const CreateUserForm: React.FC<Props> = ({
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { itemsPerPage, needsPagination } = useDynamicPageSize(
@@ -138,11 +140,68 @@ export const CreateUserForm: React.FC<Props> = ({
     }
   };
 
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setNom(user.nom_user);
+    setEmail(user.email);
+    setPassword("");
+    setRole(user.role as "user" | "admin");
+    setAgenceId(user.agence_id || user.agence?.id || "");
+    setShowEditModal(true);
+    setMessage("");
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const { data, error } = await supabase.rpc("update_user_secure", {
+        p_user_id: editingUser.id,
+        p_email: email,
+        p_password: password || null,
+        p_nom_user: nom,
+        p_role: role,
+        p_agence_id: agenceId || null,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success: boolean; message: string };
+
+      if (!result.success) {
+        setMessage(result.message);
+        setIsSuccess(false);
+        return;
+      }
+
+      setMessage("Utilisateur mis à jour avec succès");
+      setIsSuccess(true);
+
+      fetchUsers();
+
+      setTimeout(() => {
+        setShowEditModal(false);
+        resetForm();
+      }, 1500);
+
+    } catch (err) {
+      const error = err as Error;
+      setMessage(error.message || "Erreur lors de la mise à jour");
+      setIsSuccess(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setEmail("");
     setNom("");
     setPassword("");
     setRole("user");
+    setEditingUser(null);
 
     if (userRole !== "admin") {
       setAgenceId("");
@@ -289,6 +348,119 @@ export const CreateUserForm: React.FC<Props> = ({
         </div>
       )}
 
+      {showEditModal && editingUser && (
+        <div
+          className="modal-overlay"
+          onClick={() => !loading && setShowEditModal(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="modal-close-btn"
+              onClick={() => {
+                setShowEditModal(false);
+                resetForm();
+              }}
+            >
+              ×
+            </button>
+            <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
+              <div className="auth-card-icon">✏️</div>
+              <h2 className="auth-card-title">Modifier l'agent</h2>
+              <p className="auth-card-subtitle">
+                Modifiez les informations de l'agent
+              </p>
+            </div>
+
+            <form className="auth-form" onSubmit={handleEditSubmit}>
+              <div className="auth-input-grid">
+                <div className="auth-input-group">
+                  <label className="auth-input-label">Nom complet</label>
+                  <input
+                    className="auth-input"
+                    type="text"
+                    value={nom}
+                    onChange={(e) => setNom(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="auth-input-group">
+                  <label className="auth-input-label">Email</label>
+                  <input
+                    className="auth-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="auth-input-group">
+                  <label className="auth-input-label">Nouveau mot de passe</label>
+                  <input
+                    className="auth-input"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Laisser vide pour ne pas changer"
+                    minLength={6}
+                  />
+                </div>
+                <div className="auth-input-group">
+                  <label className="auth-input-label">Rôle</label>
+                  <select
+                    className="auth-select"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as "user" | "admin")}
+                    disabled={userRole === "admin"}
+                  >
+                    <option value="user">Utilisateur</option>
+                    {userRole === "super_admin" && (
+                      <option value="admin">Administrateur</option>
+                    )}
+                    {editingUser.role === "super_admin" && (
+                      <option value="super_admin">Super Administrateur</option>
+                    )}
+                  </select>
+                </div>
+                <div
+                  className="auth-input-group"
+                  style={{ gridColumn: "span 2" }}
+                >
+                  <label className="auth-input-label">Agence</label>
+                  <select
+                    className="auth-select"
+                    value={agenceId}
+                    onChange={(e) => setAgenceId(e.target.value)}
+                    disabled={userRole === "admin"}
+                  >
+                    <option value="">
+                      {userRole === "super_admin"
+                        ? "Aucune agence (Super Admin)"
+                        : "Sélectionner une agence"}
+                    </option>
+                    {agences.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button type="submit" className="auth-button" disabled={loading}>
+                {loading ? "Mise à jour..." : "Mettre à jour l'agent"}
+              </button>
+              {message && (
+                <div
+                  className={`auth-message ${isSuccess ? "auth-message--success" : "auth-message--error"}`}
+                  style={{ marginTop: "1rem" }}
+                >
+                  {message}
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="content-card" ref={tableContainerRef}>
         {fetchError && (
           <div
@@ -334,7 +506,13 @@ export const CreateUserForm: React.FC<Props> = ({
                     </span>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="icon-btn edit">
+                    <button
+                      className="icon-btn edit"
+                      onClick={() => openEditModal(user)}
+                      disabled={userRole !== "super_admin" && user.role === "super_admin"}
+                      style={userRole !== "super_admin" && user.role === "super_admin" ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                      title={userRole !== "super_admin" && user.role === "super_admin" ? "Non autorisé" : "Modifier"}
+                    >
                       <svg
                         viewBox="0 0 24 24"
                         width="18"
