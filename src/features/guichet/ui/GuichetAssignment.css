@@ -48,12 +48,12 @@
 }
 
 .checklist-item-compact:hover {
-    border-color: #8b5cf6;
+    border-color: var(--primary-color, #8b5cf6);
     background: #ffffff;
 }
 
 .checklist-item-compact.checked {
-    border-color: #8b5cf6;
+    border-color: var(--primary-color, #8b5cf6);
     background: #f5f3ff;
 }
 
@@ -76,8 +76,8 @@
 }
 
 .checklist-item-compact.checked .checkbox-custom {
-    background-color: #8b5cf6;
-    border-color: #8b5cf6;
+    background-color: var(--primary-color, #8b5cf6);
+    border-color: var(--primary-color, #8b5cf6);
 }
 
 .checkbox-custom::after {

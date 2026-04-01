@@ -16,6 +16,9 @@ import { ServicePage } from "./pages/Services";
 import { AgencePage } from "./pages/Agences";
 import { TicketsListPage } from "./pages/TicketsList";
 import { GuichetPage } from "./pages/Guichets";
+import { SettingsPage } from "./pages/Settings";
+import { KioskConfigPage } from "./pages/KioskConfig/KioskConfigPage";
+import { ThemeProvider } from "./shared/context/ThemeContext";
 
 const LoadingOverlay = ({ message }: { message: string }) => (
   <div className="global-loading-overlay">
@@ -134,6 +137,7 @@ function App() {
   };
 
   return (
+    <ThemeProvider>
     <div className="App">
       {initialLoading && <LoadingOverlay message="Chargement..." />}
 
@@ -183,6 +187,8 @@ function App() {
                 }
               />
               <Route path="/agences" element={<AgencePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/kiosk-config" element={<KioskConfigPage />} />
               <Route
                 path="/tickets-list"
                 element={
@@ -216,6 +222,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </div>
+    </ThemeProvider>
   );
 }
 

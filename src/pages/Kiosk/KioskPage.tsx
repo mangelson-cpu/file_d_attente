@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { TicketKiosk } from "../../features/ticket/ui/TicketKiosk";
 import { supabase } from "../../shared/api/supabaseClient";
 
+import { KioskAuthGuard } from "../../features/ticket/ui/KioskAuthGuard";
+
 interface Props {
   userAgenceId?: string | null;
 }
@@ -74,9 +76,12 @@ export const KioskPage: React.FC<Props> = ({ userAgenceId }) => {
   }
 
   return (
-    <TicketKiosk
-      key={activeAgenceId || "kiosk-main-key"}
-      userAgenceId={activeAgenceId ?? null}
-    />
+    <KioskAuthGuard agenceId={activeAgenceId}>
+      <TicketKiosk
+        key={activeAgenceId || "kiosk-main-key"}
+        userAgenceId={activeAgenceId ?? null}
+      />
+    </KioskAuthGuard>
   );
 };
+

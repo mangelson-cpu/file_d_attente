@@ -55,7 +55,7 @@
   width: 64px;
   height: 64px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #8b5cf6, #d4145a);
+  background: linear-gradient(135deg, var(--primary-color, #8b5cf6), var(--secondary-color, #d4145a));
   margin-bottom: 1.5rem;
   font-size: 1.8rem;
   color: white;
@@ -139,7 +139,7 @@
 
 .auth-input:focus,
 .auth-select:focus {
-  border-color: #8b5cf6;
+  border-color: var(--primary-color, #8b5cf6);
   box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
   background: #ffffff;
 }
@@ -164,7 +164,7 @@
   padding: 1rem 1.5rem;
   border-radius: 14px;
   border: none;
-  background: linear-gradient(135deg, #8b5cf6, #d4145a);
+  background: linear-gradient(135deg, var(--primary-color, #8b5cf6), var(--secondary-color, #d4145a));
   color: #fff;
   font-size: 1rem;
   font-weight: 700;

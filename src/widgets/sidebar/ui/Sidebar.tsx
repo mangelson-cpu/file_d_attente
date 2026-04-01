@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { UserRole } from "../../../shared/types";
+import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -9,8 +10,23 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [openMenus, setOpenMenus] = useState<string[]>(["/settings"]);
 
-  const navItems = [
+  const toggleMenu = (path: string) => {
+    setOpenMenus((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
+    );
+  };
+
+  interface NavItem {
+    label: string;
+    path: string;
+    icon: React.ReactNode;
+    roles: string[];
+    children?: { label: string; path: string; icon: React.ReactNode }[];
+  }
+
+  const navItems: NavItem[] = [
     {
       label: "Tableau de bord",
       path: "/",
@@ -123,7 +139,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
       ),
       roles: ["super_admin", "admin", "user"],
     },
-
+    {
+      label: "Gestion Borne",
+      path: "/kiosk-config",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <line x1="9" y1="1" x2="9" y2="4" />
+          <line x1="15" y1="1" x2="15" y2="4" />
+          <line x1="9" y1="20" x2="9" y2="23" />
+          <line x1="15" y1="20" x2="15" y2="23" />
+          <line x1="20" y1="9" x2="23" y2="9" />
+          <line x1="20" y1="14" x2="23" y2="14" />
+          <line x1="1" y1="9" x2="4" y2="9" />
+          <line x1="1" y1="14" x2="4" y2="14" />
+        </svg>
+      ),
+      roles: ["admin"],
+    },
     {
       label: "Statistiques",
       path: "/stats",
@@ -160,6 +201,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
         </svg>
       ),
       roles: ["super_admin"],
+      children: [
+        {
+          label: "Thème & Couleurs",
+          path: "/settings",
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+            </svg>
+          ),
+        },
+      ],
     },
   ];
 
@@ -177,16 +236,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
       </div>
 
       <nav className="sidebar-nav">
-        {visibleNavItems.map((item) => (
-          <button
-            key={item.path}
-            className={`sidebar-nav-item ${location.pathname === item.path ? "sidebar-nav-item--active" : ""}`}
-            onClick={() => navigate(item.path)}
-          >
-            <span className="sidebar-nav-icon">{item.icon}</span>
-            <span className="sidebar-nav-label">{item.label}</span>
-          </button>
-        ))}
+        {visibleNavItems.map((item) => {
+          const hasChildren = item.children && item.children.length > 0;
+          const isOpen = openMenus.includes(item.path);
+          const isChildActive = hasChildren && item.children!.some((c) => location.pathname === c.path);
+          const isActive = !hasChildren && location.pathname === item.path;
+
+          return (
+            <div key={item.path} className="sidebar-nav-group">
+              <button
+                className={`sidebar-nav-item ${isActive || (hasChildren && isChildActive && !isOpen) ? "sidebar-nav-item--active" : ""}`}
+                onClick={() => {
+                  if (hasChildren) {
+                    toggleMenu(item.path);
+                  } else {
+                    navigate(item.path);
+                  }
+                }}
+              >
+                <span className="sidebar-nav-icon">{item.icon}</span>
+                <span className="sidebar-nav-label">{item.label}</span>
+                {hasChildren && (
+                  <span className="sidebar-nav-chevron">
+                    {isOpen ? <FiChevronDown size={16} /> : <FiChevronRight size={16} />}
+                  </span>
+                )}
+              </button>
+
+              {hasChildren && isOpen && (
+                <div className="sidebar-sub-items">
+                  {item.children!.map((child) => (
+                    <button
+                      key={child.path + child.label}
+                      className={`sidebar-sub-item ${location.pathname === child.path ? "sidebar-sub-item--active" : ""}`}
+                      onClick={() => navigate(child.path)}
+                    >
+                      <span className="sidebar-nav-icon">{child.icon}</span>
+                      <span>{child.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">

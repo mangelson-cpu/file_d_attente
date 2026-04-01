@@ -112,7 +112,7 @@
 .searching-pulse {
     width: 40px;
     height: 40px;
-    background-color: #8b5cf6;
+    background-color: var(--primary-color, #8b5cf6);
     border-radius: 50%;
     animation: searchingPulse 1.2s infinite ease-in-out;
 }
@@ -189,7 +189,7 @@
     font-weight: 900;
     line-height: 1;
     margin: 0;
-    background: linear-gradient(135deg, #4f0bfb 0%, #a208b5 50%, #d4145a 100%);
+    background: linear-gradient(135deg, var(--primary-color, #4f0bfb) 0%, var(--secondary-color, #d4145a) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -261,7 +261,7 @@
 
 /* Terminer Button (Right) */
 .btn-terminer-mockup {
-    background: linear-gradient(135deg, #4f0bfb 0%, #a208b5 50%, #d4145a 100%);
+    background: linear-gradient(135deg, var(--primary-color, #4f0bfb) 0%, var(--secondary-color, #d4145a) 100%);
     color: white;
     border: none;
     padding: 0.75rem 1.5rem;
@@ -340,7 +340,7 @@
 
 .ticket-calling {
     animation: pulseCallingATM 1.5s infinite;
-    border-color: #8b5cf6 !important;
+    border-color: var(--primary-color, #8b5cf6) !important;
 }
 
 @keyframes pulseCallingATM {

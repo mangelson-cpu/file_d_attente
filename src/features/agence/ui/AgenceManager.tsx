@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../../shared/api/supabaseClient";
+import { FiLock } from "react-icons/fi";
 import type { Agence } from "../../../shared/types";
 
 export const AgenceManager: React.FC = () => {
@@ -13,6 +14,15 @@ export const AgenceManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  
+  // Kiosk Security Modal State
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityAgence, setSecurityAgence] = useState<Agence | null>(null);
+  const [kioskPassword, setKioskPassword] = useState("");
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState("");
+  const [securityIsSuccess, setSecurityIsSuccess] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { itemsPerPage, needsPagination } = useDynamicPageSize(
@@ -128,6 +138,49 @@ export const AgenceManager: React.FC = () => {
     setIsSuccess(false);
   };
 
+  const openSecurityModal = (agence: Agence) => {
+    setSecurityAgence(agence);
+    setKioskPassword("");
+    setSecurityMessage("");
+    setShowSecurityModal(true);
+  };
+
+  const handleSecuritySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!securityAgence) return;
+
+    setSecurityLoading(true);
+    setSecurityMessage("");
+
+    try {
+      const { error } = await supabase.rpc("update_kiosk_password", {
+        p_password: kioskPassword,
+        p_agence_id: securityAgence.id,
+      });
+
+      if (error) throw error;
+
+      setSecurityMessage(
+        kioskPassword
+          ? "Mot de passe de la borne mis à jour !"
+          : "Mot de passe supprimé (borne déverrouillée)."
+      );
+      setSecurityIsSuccess(true);
+      setKioskPassword("");
+      
+      setTimeout(() => {
+        setShowSecurityModal(false);
+        setSecurityMessage("");
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      setSecurityMessage(err.message || "Erreur lors de la mise à jour.");
+      setSecurityIsSuccess(false);
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
   return (
     <div className="agences-page">
       <header className="page-header">
@@ -201,6 +254,55 @@ export const AgenceManager: React.FC = () => {
                   style={{ marginTop: "1rem" }}
                 >
                   {message}
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSecurityModal && securityAgence && (
+        <div
+          className="modal-overlay"
+          onClick={() => !securityLoading && setShowSecurityModal(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="modal-close-btn"
+              onClick={() => setShowSecurityModal(false)}
+            >
+              ×
+            </button>
+            <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
+              <div className="auth-card-icon" style={{ background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))", color: "white" }}>
+                <FiLock size={24} />
+              </div>
+              <h2 className="auth-card-title">Sécurité Borne</h2>
+              <p className="auth-card-subtitle">
+                Gérer le verrouillage de l'agence <strong>{securityAgence.nom}</strong>
+              </p>
+            </div>
+
+            <form className="auth-form" onSubmit={handleSecuritySubmit}>
+              <div className="auth-input-group">
+                <label className="auth-input-label">Nouveau mot de passe de la borne</label>
+                <input
+                  className="auth-input"
+                  type="password"
+                  value={kioskPassword}
+                  onChange={(e) => setKioskPassword(e.target.value)}
+                  placeholder="Laisser vide pour désactiver"
+                />
+              </div>
+              <button type="submit" className="auth-button" disabled={securityLoading}>
+                {securityLoading ? "Enregistrement..." : "Appliquer la sécurité"}
+              </button>
+              {securityMessage && (
+                <div
+                  className={`auth-message ${securityIsSuccess ? "auth-message--success" : "auth-message--error"}`}
+                  style={{ marginTop: "1rem" }}
+                >
+                  {securityMessage}
                 </div>
               )}
             </form>
@@ -386,6 +488,14 @@ export const AgenceManager: React.FC = () => {
                         : "---"}
                     </td>
                     <td style={{ textAlign: "right" }}>
+                      <button
+                        className="icon-btn"
+                        style={{ color: "var(--primary-color)" }}
+                        onClick={() => openSecurityModal(agence)}
+                        title="Configurer la sécurité de la borne"
+                      >
+                        <FiLock size={18} />
+                      </button>
                       <button
                         className="icon-btn edit"
                         onClick={() => openEditModal(agence)}

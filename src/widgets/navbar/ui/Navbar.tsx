@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../../shared/api/supabaseClient";
 import { FiUser } from "react-icons/fi";
+import { FaUser } from 'react-icons/fa';
 
 interface NavbarProps {
   onLogout: () => void;
@@ -184,9 +185,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
         <div className="navbar-divider"></div>
 
         <div className="navbar-actions">
-          <button 
-            className="navbar-icon-btn" 
-            title="Se déconnecter" 
+          <button
+            className="navbar-icon-btn"
+            title="Se déconnecter"
             onClick={onLogout}
             style={{ width: 'auto', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px' }}
           >
@@ -222,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">👤</div>
+              <div className="auth-card-icon"><FaUser style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">Mon Profil</h2>
               <p className="auth-card-subtitle">
                 Modifiez vos informations personnelles
