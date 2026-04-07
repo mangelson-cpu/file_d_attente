@@ -9,10 +9,18 @@ interface DashboardTicket {
   status: string;
   nom_guichet: string | null;
   agence_id: string;
+  service_id: string;
+  user_id: string | null;
+  priority_id?: string | null;
   niveau: string;
   date_debut: string | null;
   date_fin: string | null;
   created_at: string;
+  priority?: {
+    valeur: number;
+    couleur: string;
+    nom: string;
+  } | any;
 }
 
 interface QueueDashboardProps {
@@ -35,6 +43,9 @@ if (typeof document !== "undefined") {
   document.addEventListener("touchstart", unlockSpeech, { once: true });
 }
 
+let lastAnnouncementTime = 0;
+let lastAnnouncementKey = "";
+
 function announceTicket(
   numeroTicket: string,
   nomGuichet: string | null,
@@ -56,29 +67,55 @@ function announceTicket(
     ? `${ticketMatches[1]} ${ticketMatches[2]}`.trim()
     : numeroTicket;
 
-  const announcementText = `${prononceTicket}, ... ${guichetText}`;
+  const announcementText = `${prononceTicket}, ${guichetText}`;
+
+  const now = Date.now();
+  const currentKey = prononceTicket.replace(/\s/g, '').toLowerCase();
+
+  if (currentKey === lastAnnouncementKey && now - lastAnnouncementTime < 4000) {
+    return;
+  }
+  lastAnnouncementTime = now;
+  lastAnnouncementKey = currentKey;
 
   const speak = () => {
+    // On récupère les voix à l'intérieur de speak pour avoir la liste à jour
+    const voices = window.speechSynthesis.getVoices();
+
+    // Recherche de la voix Google en français d'abord
+    let selectedVoice = voices.find(
+      (v) =>
+        v.name.includes("Google") &&
+        (v.lang === "fr-FR" || v.lang.startsWith("fr")),
+    );
+
+    // Fallback: Si pas de voix Google, on cherche n'importe quelle voix française
+    if (!selectedVoice) {
+      selectedVoice = voices.find((v) => v.lang === "fr-FR" || v.lang.startsWith("fr"));
+    }
+
+    // Fallback: Si toujours rien, on prend la première voix disponible
+    if (!selectedVoice && voices.length > 0) {
+      selectedVoice = voices[0];
+    }
+
+    // Si les voix ne sont pas encore chargées, on attend
+    if (!selectedVoice && voices.length === 0) {
+      console.warn("Voix non prêtes, nouvel essai dans 500ms...");
+      setTimeout(speak, 500);
+      return;
+    }
+
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(announcementText);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
     utterance.lang = "fr-FR";
-    utterance.rate = 0.35;
+    utterance.rate = 0.40;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
-
-    const voices = window.speechSynthesis.getVoices();
-    const googleVoice = voices.find(
-      (v) =>
-        v.name.includes("Google") &&
-        (v.lang === "fr-FR" || v.lang.includes("fr")),
-    );
-    const fallbackVoice = voices.find(
-      (v) => v.lang === "fr-FR" || v.lang.includes("fr"),
-    );
-
-    if (googleVoice) utterance.voice = googleVoice;
-    else if (fallbackVoice) utterance.voice = fallbackVoice;
 
     setTimeout(() => {
       window.speechSynthesis.resume();
@@ -86,6 +123,7 @@ function announceTicket(
     }, 100);
   };
 
+  // Logique de déclenchement
   if (window.speechSynthesis.getVoices().length === 0) {
     window.speechSynthesis.onvoiceschanged = () => {
       speak();
@@ -137,7 +175,7 @@ export const QueueDashboard: React.FC<QueueDashboardProps> = ({
   const appellationsRef = useRef<Record<string, string>>({});
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastAnnouncedTicketId = useRef<string | null>(null);
+
 
   useEffect(() => {
     if (window.speechSynthesis) {
@@ -176,13 +214,19 @@ export const QueueDashboard: React.FC<QueueDashboardProps> = ({
       const { data, error } = await supabase
         .from("ticket")
         .select(
-          "id, numero_ticket, status, nom_guichet, agence_id, niveau, date_debut, date_fin, created_at",
+          "id, numero_ticket, status, nom_guichet, agence_id, service_id, user_id, niveau, date_debut, date_fin, created_at, priority_id, priority(valeur, couleur, nom)",
         )
         .eq("agence_id", agenceId)
         .gte("created_at", today.toISOString())
         .order("created_at", { ascending: true });
 
-      if (data && !error) setTickets(data as DashboardTicket[]);
+      if (data && !error) {
+        const transformedData = (data as any[]).map(t => ({
+          ...t,
+          priority: Array.isArray(t.priority) ? t.priority[0] : t.priority
+        }));
+        setTickets(transformedData as DashboardTicket[]);
+      }
     };
 
     const fetchAppellations = async () => {
@@ -204,22 +248,26 @@ export const QueueDashboard: React.FC<QueueDashboardProps> = ({
     fetchAppellations();
     fetchTodayTickets();
 
+    const showAndAnnounceTicket = (ticket: DashboardTicket) => {
+      setPopupTicket(ticket);
+      setTimeout(() => setPopupTicket(null), 5000);
+
+      // Delay speech slightly to let the popup appear
+      setTimeout(() => {
+        announceTicket(
+          ticket.numero_ticket,
+          ticket.nom_guichet,
+          appellationsRef.current
+        );
+      }, 300);
+    };
+
     const channel = supabase
       .channel("public_dashboard_tickets")
       .on("broadcast", { event: "rappel_ticket" }, (payload) => {
         const { ticket } = payload.payload;
         if (ticket.agence_id && ticket.agence_id !== agenceId) return;
-        setPopupTicket(ticket);
-        setTimeout(() => setPopupTicket(null), 5000);
-        setTimeout(
-          () =>
-            announceTicket(
-              ticket.numero_ticket,
-              ticket.nom_guichet,
-              appellationsRef.current,
-            ),
-          300,
-        );
+        showAndAnnounceTicket(ticket);
       })
       .on(
         "postgres_changes",
@@ -231,35 +279,22 @@ export const QueueDashboard: React.FC<QueueDashboardProps> = ({
           if (payload.eventType === "INSERT") {
             setTickets((prev) => [...prev, newTicket]);
           } else if (payload.eventType === "UPDATE") {
+            // Update the tickets list
             setTickets((prev) => {
               const ticketIndex = prev.findIndex((t) => t.id === newTicket.id);
               if (ticketIndex === -1) return prev;
-
-              const mergedTicket = { ...prev[ticketIndex], ...newTicket };
-
-              if (newTicket.status === "called") {
-                setTimeout(() => {
-                  setPopupTicket(mergedTicket);
-                  setTimeout(() => setPopupTicket(null), 5000);
-                  if (lastAnnouncedTicketId.current !== mergedTicket.id) {
-                    lastAnnouncedTicketId.current = mergedTicket.id;
-                    setTimeout(
-                      () =>
-                        announceTicket(
-                          mergedTicket.numero_ticket,
-                          mergedTicket.nom_guichet,
-                          appellationsRef.current,
-                        ),
-                      300,
-                    );
-                  }
-                }, 0);
-              }
-
               const newTickets = [...prev];
-              newTickets[ticketIndex] = mergedTicket;
+              newTickets[ticketIndex] = { ...prev[ticketIndex], ...newTicket };
               return newTickets;
             });
+
+            // Trigger announcement if status becomes "called"
+            if (newTicket.status === "called") {
+              // We use payload.new directly but with potential fields from current set if missing
+              // However, since we want the latest info, we can wait a bit or use a ref.
+              // For simplicity and since AgentTicketManager sends full info, we just use newTicket here.
+              showAndAnnounceTicket(newTicket);
+            }
           }
         },
       )
@@ -271,7 +306,7 @@ export const QueueDashboard: React.FC<QueueDashboardProps> = ({
   }, [agenceId]);
 
   const waitingTickets = useMemo(
-    () => sortByPriority(tickets.filter((t) => t.status === "waiting")),
+    () => sortByPriority(tickets.filter((t) => t.status === "waiting") as any),
     [tickets],
   );
   const calledTickets = useMemo(

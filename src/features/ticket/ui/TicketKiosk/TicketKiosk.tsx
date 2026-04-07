@@ -320,9 +320,14 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
           <div className="step-dot inactive"></div>
         </div>
 
-        <h2 className="kiosk-page-title">Sélectionnez un service</h2>
-
-        <div className="kiosk-cards-grid">
+        <div className="kiosk-services-wrapper">
+          <h2 className="kiosk-page-title">Sélectionnez un service</h2>
+          <div 
+            className="kiosk-cards-grid"
+            style={{
+              maxWidth: services.length === 4 ? '700px' : (services.length >= 6 ? '1050px' : '800px')
+            }}
+          >
           {services.length > 0 ? (
             services.map((service) => (
               <button
@@ -343,6 +348,7 @@ export const TicketKiosk: React.FC<Props> = ({ userAgenceId }) => {
               </p>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>

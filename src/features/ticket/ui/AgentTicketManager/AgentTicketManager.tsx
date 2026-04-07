@@ -229,7 +229,7 @@ export const AgentTicketManager: React.FC = () => {
     
     const { data: dataTicket, error: dataError } = await supabase
       .from("ticket")
-      .select("*, service(nom_service)")
+      .select("*, service(nom_service), priority(*)")
       .in("status", ["waiting", "ready", "called"])
       .in("service_id", guichetServices)
       .order("created_at", { ascending: true });
@@ -682,9 +682,14 @@ export const AgentTicketManager: React.FC = () => {
                           {formatTicketNumber(currentTicket.numero_ticket)}
                         </span>
                         <span
-                          className={`priority-tag ${getPriorityClass(currentTicket.niveau)}`}
+                          className={`priority-tag ${currentTicket.priority ? "" : getPriorityClass(currentTicket.niveau)}`}
+                          style={currentTicket.priority ? { 
+                            backgroundColor: currentTicket.priority.couleur,
+                            color: "#fff",
+                            boxShadow: `0 2px 8px ${currentTicket.priority.couleur}44`
+                          } : {}}
                         >
-                          {currentTicket.niveau}
+                          {currentTicket.priority ? currentTicket.priority.nom : currentTicket.niveau}
                         </span>
                       </div>
                     </div>

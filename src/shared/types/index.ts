@@ -57,7 +57,24 @@ export type TicketStatus =
   | "called"
   | "done"
   | "cancelled";
-export type TicketNiveau = "Normal" | "Urgent" | "VIP";
+
+export interface Priority {
+  id: string;
+  nom: string;
+  valeur: number;
+  couleur: string;
+  icone: string | null;
+  created_at: string;
+}
+
+export interface AgencePriority {
+  id: string;
+  agence_id: string;
+  priority_id: string;
+  is_active: boolean;
+  created_at: string;
+  priority?: Priority;
+}
 
 export interface Ticket {
   id: string;
@@ -67,7 +84,8 @@ export interface Ticket {
   nom_guichet: string | null;
   user_id: string | null;
   sous_service_id?: string | null;
-  niveau: TicketNiveau;
+  priority_id?: string | null;
+  niveau: string;
   status: TicketStatus;
   date_debut: string | null;
   date_fin: string | null;
@@ -75,6 +93,7 @@ export interface Ticket {
   service?: Service;
   sous_service?: SousService;
   agence?: Agence;
+  priority?: Priority;
   agent?: {
     nom_user: string;
   };

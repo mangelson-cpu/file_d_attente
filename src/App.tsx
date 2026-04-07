@@ -18,6 +18,7 @@ import { TicketsListPage } from "./pages/TicketsList";
 import { GuichetPage } from "./pages/Guichets";
 import { SettingsPage } from "./pages/Settings";
 import { KioskConfigPage } from "./pages/KioskConfig/KioskConfigPage";
+import { PrioritiesPage } from "./pages/Priority/PrioritiesPage";
 import { ThemeProvider } from "./shared/context/ThemeContext";
 
 const LoadingOverlay = ({ message }: { message: string }) => (
@@ -181,6 +182,15 @@ function App() {
                 path="/services"
                 element={
                   <ServicePage
+                    userRole={userRole}
+                    currentUserAgenceId={userAgenceId}
+                  />
+                }
+              />
+              <Route
+                path="/priorities"
+                element={
+                  <PrioritiesPage
                     userRole={userRole}
                     currentUserAgenceId={userAgenceId}
                   />

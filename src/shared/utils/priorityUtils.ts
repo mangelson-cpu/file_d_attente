@@ -1,4 +1,4 @@
-import type { TicketNiveau } from "../types";
+import type { Ticket } from "../types";
 
 export function getPriorityWeight(niveau: string): number {
   switch (niveau.toLowerCase()) {
@@ -8,18 +8,20 @@ export function getPriorityWeight(niveau: string): number {
       return 1;
     case "normal":
     default:
-      return 2;
+      return 1000; // Using a high number for unknown priorities
   }
 }
 
-export function sortByPriority<
-  T extends { niveau: TicketNiveau | string; created_at: string },
->(tickets: T[]): T[] {
+export function sortByPriority<T extends Ticket>(tickets: T[]): T[] {
   return [...tickets].sort((a, b) => {
-    const priorityDiff =
-      getPriorityWeight(a.niveau) - getPriorityWeight(b.niveau);
+    // If priority object is present, use its valeur
+    const aWeight = a.priority ? a.priority.valeur : getPriorityWeight(a.niveau || "");
+    const bWeight = b.priority ? b.priority.valeur : getPriorityWeight(b.niveau || "");
+
+    const priorityDiff = aWeight - bWeight;
     if (priorityDiff !== 0) return priorityDiff;
 
+    // Use creation time as fallback
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 }

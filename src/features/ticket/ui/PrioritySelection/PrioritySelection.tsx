@@ -1,10 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "../../../../shared/api/supabaseClient";
 import "./PrioritySelection.css";
-import normalImg from "../../../../assets/priority_normal.png";
-import urgentImg from "../../../../assets/priority_urgent.png";
-import vipImg from "../../../../assets/priority_vip.png";
+import money1 from "../../../../assets/money_1.png";
+import money2 from "../../../../assets/money_2.png";
+import money3 from "../../../../assets/money_3.png";
+import money4 from "../../../../assets/money_4.png";
+import money5 from "../../../../assets/money_5.png";
+import money6 from "../../../../assets/money_6.png";
+
+const moneyImages = [money1, money2, money3, money4, money5, money6];
 
 export const PrioritySelection: React.FC = () => {
   const currentTime = new Date();
@@ -12,15 +17,48 @@ export const PrioritySelection: React.FC = () => {
   const location = useLocation();
   const { slug } = useParams<{ slug: string }>();
   const [isGenerating, setIsGenerating] = useState(false);
+  const isGeneratingRef = useRef(false);
+  const [dbPriorities, setDbPriorities] = useState<any[]>([]);
 
   const basePath = slug ? `/${slug}/borne` : "/ticket";
   const { serviceId, serviceName, agenceId, agenceName } = location.state || {};
 
-  const priorities = [
-    { id: "normal", name: "Normal", image: normalImg, color: "#64748b" },
-    { id: "urgent", name: "Urgent", image: urgentImg, color: "#f97316" },
-    { id: "vip", name: "VIP", image: vipImg, color: "#eab308" },
-  ];
+  useEffect(() => {
+    const fetchActivePriorities = async () => {
+      if (!agenceId) return;
+      try {
+        const { data, error } = await supabase
+          .from("agence_priority")
+          .select("*, priority(*)")
+          .eq("agence_id", agenceId)
+          .eq("is_active", true);
+
+        if (error) throw error;
+        if (data) {
+          // Extract the nested priority objects and sort by valeur
+          const sorted = data
+            .map((ap: any) => ap.priority)
+            .filter(Boolean)
+            .sort((a: any, b: any) => a.valeur - b.valeur);
+          setDbPriorities(sorted);
+        }
+      } catch (err) {
+        console.error("Error fetching active priorities:", err);
+      }
+    };
+
+    fetchActivePriorities();
+  }, [agenceId]);
+
+  const getIcon = (priority: any) => {
+    // Stable random index based on ID
+    if (priority.id) {
+      const idNum = priority.id.split('-').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      return moneyImages[idNum % moneyImages.length];
+    }
+    
+    return moneyImages[0];
+  };
 
   const getTicketPrefix = (serviceName: string): string => {
     const name = (serviceName || "").toLowerCase();
@@ -31,21 +69,23 @@ export const PrioritySelection: React.FC = () => {
     return "T";
   };
 
-  const handlePrioritySelect = async (priority: (typeof priorities)[0]) => {
+  const handlePrioritySelect = async (priority: any) => {
     console.log("PrioritySelection: Starting ticket generation...", {
       serviceId,
       agenceId,
-      priority: priority.id,
+      priorityId: priority.id,
+      priorityName: priority.nom,
     });
 
-    if (!serviceId || !agenceId || isGenerating) {
+    if (!serviceId || !agenceId || isGeneratingRef.current) {
       console.warn(
         "PrioritySelection: Aborting - missing data or already generating",
-        { serviceId, agenceId, isGenerating },
+        { serviceId, agenceId, isGenerating: isGeneratingRef.current },
       );
       return;
     }
 
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     try {
       const prefix = getTicketPrefix(serviceName);
@@ -71,8 +111,9 @@ export const PrioritySelection: React.FC = () => {
           numero_ticket: numeroTicket,
           agence_id: agenceId,
           service_id: serviceId,
+          priority_id: priority.id,
           nom_guichet: null,
-          niveau: priority.name,
+          niveau: priority.nom,
           status: "waiting",
         })
         .select()
@@ -89,7 +130,7 @@ export const PrioritySelection: React.FC = () => {
         state: {
           ticket: newTicket,
           serviceName: serviceName,
-          priorityName: priority.name,
+          priorityName: priority.nom,
           agenceName: agenceName,
         },
       });
@@ -100,6 +141,7 @@ export const PrioritySelection: React.FC = () => {
         `Erreur lors de la génération du ticket: ${error.message || "Erreur inconnue"}`,
       );
     } finally {
+      isGeneratingRef.current = false;
       setIsGenerating(false);
     }
   };
@@ -153,55 +195,63 @@ export const PrioritySelection: React.FC = () => {
           <div className="step-dot inactive"></div>
         </div>
 
-        <h2 className="kiosk-page-title">
-          Choisissez votre niveau pour {serviceName}
-        </h2>
+        <div className="kiosk-services-wrapper">
+          <h2 className="kiosk-page-title">
+            Choisissez votre niveau pour {serviceName}
+          </h2>
 
-        <div className="priority-cards-grid">
-          {priorities.map((priority) => (
-            <button
-              key={priority.id}
-              className={`priority-card ${isGenerating ? "disabled" : ""}`}
-              onClick={() => handlePrioritySelect(priority)}
-              disabled={isGenerating}
-            >
-              <div className="priority-card-image-wrapper">
-                <img
-                  src={priority.image}
-                  alt={priority.name}
-                  className="priority-image"
-                />
-              </div>
-              <div className="priority-card-footer">
-                <div
-                  className="priority-dot"
-                  style={{ backgroundColor: priority.color }}
-                ></div>
-                <span className="priority-name">{priority.name}</span>
-              </div>
-            </button>
-          ))}
+          <div className="priority-cards-grid">
+          {dbPriorities.length > 0 ? (
+            dbPriorities.map((priority) => (
+              <button
+                key={priority.id}
+                className={`priority-card ${isGenerating ? "disabled" : ""}`}
+                onClick={() => handlePrioritySelect(priority)}
+                disabled={isGenerating}
+              >
+                <div className="priority-card-image-wrapper">
+                  <img
+                    src={getIcon(priority)}
+                    alt={priority.nom}
+                    className="priority-image drawing-style"
+                  />
+                </div>
+                <div className="priority-card-footer">
+                  <div
+                    className="priority-dot"
+                    style={{ backgroundColor: priority.couleur }}
+                  ></div>
+                  <span className="priority-name">{priority.nom}</span>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>
+              {isGenerating ? "Chargement..." : "Aucun niveau de priorité disponible."}
+            </div>
+          )}
         </div>
+      </div>
 
-        <button
-          className="kiosk-back-button"
-          onClick={() => navigate(basePath)}
-          disabled={isGenerating}
+      <button
+        className="kiosk-back-button"
+        onClick={() => navigate(basePath)}
+        disabled={isGenerating}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="back-icon"
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="back-icon"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span>Retour</span>
-        </button>
-      </main>
-    </div>
-  );
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        <span>Retour</span>
+      </button>
+    </main>
+  </div>
+);
 };

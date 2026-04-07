@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import "./TicketGenerated.css";
 
@@ -124,6 +124,7 @@ export const TicketGenerated: React.FC = () => {
   const [peopleWaiting, setPeopleWaiting] = useState<number>(0);
   const [printStatus, setPrintStatus] = useState<string>("");
   const [hasPrinted, setHasPrinted] = useState<boolean>(false);
+  const isPrintingRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const currentTime = new Date();
   const navigate = useNavigate();
@@ -157,7 +158,8 @@ export const TicketGenerated: React.FC = () => {
 
   const attemptPrint = React.useCallback(
     async (waitingCount: number = peopleWaiting) => {
-      if (!ticket || hasPrinted) return;
+      if (!ticket || hasPrinted || isPrintingRef.current) return;
+      isPrintingRef.current = true;
 
       try {
         const nav = navigator as unknown as NavigatorWithUSB;
@@ -178,14 +180,17 @@ export const TicketGenerated: React.FC = () => {
             setHasPrinted(true);
           } else {
             setPrintStatus("Imprimante non détectée");
+            isPrintingRef.current = false;
           }
         } else {
           setPrintStatus("USB non supporté (vérifiez HTTPS/flags)");
+          isPrintingRef.current = false;
         }
       } catch (err) {
         const e = err as Error;
         setPrintStatus(`Erreur d'impression: ${e.message || "Échec"}`);
         setHasPrinted(false);
+        isPrintingRef.current = false;
       }
     },
     [ticket, serviceName, priorityName, agenceName, peopleWaiting, hasPrinted],
@@ -275,7 +280,7 @@ export const TicketGenerated: React.FC = () => {
         const { count: hc, error: hErr } = await supabase
           .from("ticket")
           .select("id", { count: "exact" })
-          .eq("service_id", ticket.service_id)
+          .eq("agence_id", ticket.agence_id)
           .eq("status", "waiting")
           .in("niveau", higherPriorityLevels);
 
@@ -296,7 +301,7 @@ export const TicketGenerated: React.FC = () => {
       const { count: sameCount, error: sErr } = await supabase
         .from("ticket")
         .select("id", { count: "exact" })
-        .eq("service_id", ticket.service_id)
+        .eq("agence_id", ticket.agence_id)
         .eq("status", "waiting")
         .in("niveau", uniqueVariants)
         .lt("created_at", ticket.created_at);
@@ -307,33 +312,12 @@ export const TicketGenerated: React.FC = () => {
         waitingCount = higherCount;
       }
 
-      try {
-        const { data: activeGuichets } = await supabase
-          .from("active_guichets")
-          .select("nom_guichet")
-          .eq("agence_id", ticket.agence_id);
+      console.log(
+        `[DEBUG TICKETS] Total brut : ${higherCount} (Priorité supérieure) + ${sameCount || 0} (Même niveau avant vous) = ${waitingCount}`
+      );
 
-        if (activeGuichets && activeGuichets.length > 0) {
-          const activeNames = activeGuichets.map((g) => g.nom_guichet);
-          const { data: servingGuichets } = await supabase
-            .from("guichet_service")
-            .select("nom_guichet")
-            .eq("service_id", ticket.service_id)
-            .eq("agence_id", ticket.agence_id)
-            .in("nom_guichet", activeNames);
-
-          const activeCount = servingGuichets?.length || 1;
-          if (activeCount > 1) {
-            waitingCount = Math.ceil(waitingCount / activeCount);
-          }
-        }
-      } catch (guichetError) {
-        console.warn(
-          "Erreur lors du calcul des guichets actifs:",
-          guichetError,
-        );
-      }
-
+      // On n'utilise plus la division par le nombre de guichets pour afficher le nombre exact de personnes physiquement devant le client.
+      console.log("[DEBUG TICKETS] 👉 Total FINAL des personnes avant vous :", waitingCount);
       setPeopleWaiting(waitingCount);
 
       await attemptPrint(waitingCount);
