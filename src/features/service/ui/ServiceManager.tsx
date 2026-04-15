@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../../shared/api/supabaseClient";
+import { FiTool } from "react-icons/fi";
 import type { Service, UserRole } from "../../../shared/types";
 import { SousServiceModal } from "./SousServiceModal";
 
@@ -190,7 +191,7 @@ export const ServiceManager: React.FC<Props> = ({ userRole }) => {
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">🛠️</div>
+              <div className="auth-card-icon"><FiTool style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">
                 {editingService ? "Modifier le service" : "Nouveau Service"}
               </h2>

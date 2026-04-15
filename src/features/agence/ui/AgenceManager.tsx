@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../../shared/api/supabaseClient";
-import { FiLock } from "react-icons/fi";
+import { FiLock, FiBriefcase } from "react-icons/fi";
 import type { Agence } from "../../../shared/types";
 
 export const AgenceManager: React.FC = () => {
@@ -206,7 +206,7 @@ export const AgenceManager: React.FC = () => {
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">🏢</div>
+              <div className="auth-card-icon"><FiBriefcase style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">
                 {editingAgence ? "Modifier l'agence" : "Nouvelle Agence"}
               </h2>

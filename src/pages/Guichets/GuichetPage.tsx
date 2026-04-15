@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../shared/api/supabaseClient";
 import type { Guichet, UserRole } from "../../shared/types";
+import { FiTag } from "react-icons/fi";
 import "./GuichetPage.css";
 
 interface Props {
@@ -183,7 +184,7 @@ export const GuichetPage: React.FC<Props> = ({
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">🏷️</div>
+              <div className="auth-card-icon"><FiTag style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">Appellation du Guichet</h2>
               <p className="auth-card-subtitle">
                 Définissez le nom public du guichet

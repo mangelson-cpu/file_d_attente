@@ -640,6 +640,15 @@ body:has(.app-layout) {
     overflow: hidden;
 }
 
+/* Transparent variant — used when dark-glass cards are already inside */
+.content-card--transparent {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+
 /* Table styling */
 .premium-table {
     width: 100%;
@@ -828,7 +837,6 @@ body.layout-active {
 .modal-close-btn:hover {
     background: #e2e8f0;
     color: #1e293b;
-    transform: rotate(90deg);
 }
 
 /* ==================================================

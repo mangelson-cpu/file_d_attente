@@ -7,6 +7,7 @@ import type {
   GuichetService,
   UserRole,
 } from "../../../shared/types";
+import { FiTool } from "react-icons/fi";
 import "./GuichetAssignment.css";
 
 interface Props {
@@ -298,7 +299,7 @@ export const GuichetAssignment: React.FC<Props> = ({
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">🛠️</div>
+              <div className="auth-card-icon"><FiTool style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">Affectation de Services</h2>
               <p className="auth-card-subtitle">
                 Choisissez un guichet et cochez ses services

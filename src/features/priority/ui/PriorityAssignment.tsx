@@ -1,73 +1,83 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../../../shared/api/supabaseClient";
 import type { Priority, AgencePriority, UserRole } from "../../../shared/types";
+import { useDynamicPageSize } from "../../../shared/hooks/useDynamicPageSize";
 
 interface Props {
   userRole: UserRole;
   currentUserAgenceId: string | null;
 }
 
+const getIconEmoji = (icone?: string | null) => {
+  if (icone === "urgent") return "🔴";
+  if (icone === "vip") return "⭐";
+  if (icone === "normal") return "🟢";
+  return "🔹";
+};
+
 export const PriorityAssignment: React.FC<Props> = ({ userRole, currentUserAgenceId }) => {
   const [globalPriorities, setGlobalPriorities] = useState<Priority[]>([]);
   const [agencyPriorities, setAgencyPriorities] = useState<AgencePriority[]>([]);
   const [loading, setLoading] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchGlobalPriorities = useCallback(async () => {
+  const { itemsPerPage, needsPagination } = useDynamicPageSize(
+    tableContainerRef,
+    globalPriorities.length
+  );
+
+  const fetchPriorities = useCallback(async () => {
+    if (!currentUserAgenceId) return;
+    setFetchError("");
     try {
-      const { data, error } = await supabase
+      // Fetch available catalyst
+      const { data: globalData, error: globalError } = await supabase
         .from("priority")
         .select("*")
         .order("valeur", { ascending: true });
 
-      if (error) throw error;
-      if (data) {
-        setGlobalPriorities(data as Priority[]);
-      }
-    } catch (err) {
-      console.error("Error fetching global priorities:", err);
-      setFetchError("Impossible de charger le catalogue des priorités.");
-    }
-  }, []);
+      if (globalError) throw globalError;
 
-  const fetchAgencyPriorities = useCallback(async () => {
-    if (!currentUserAgenceId) return;
-    try {
-      const { data, error } = await supabase
+      // Fetch current agency settings
+      const { data: agencyData, error: agencyError } = await supabase
         .from("agence_priority")
         .select("*")
         .eq("agence_id", currentUserAgenceId);
 
-      if (error) throw error;
-      if (data) {
-        setAgencyPriorities(data as AgencePriority[]);
-      }
+      if (agencyError) throw agencyError;
+
+      if (globalData) setGlobalPriorities(globalData as Priority[]);
+      if (agencyData) setAgencyPriorities(agencyData as AgencePriority[]);
     } catch (err) {
-      console.error("Error fetching agency priorities:", err);
+      const error = err as Error;
+      setFetchError(error.message || "Erreur lors du chargement des données");
     }
   }, [currentUserAgenceId]);
 
   useEffect(() => {
-    const loadAll = async () => {
+    const load = async () => {
       setLoading(true);
-      await Promise.all([fetchGlobalPriorities(), fetchAgencyPriorities()]);
+      await fetchPriorities();
       setLoading(false);
     };
-    loadAll();
-  }, [fetchGlobalPriorities, fetchAgencyPriorities]);
+    load();
+  }, [fetchPriorities]);
 
   const togglePriority = async (priorityId: string) => {
-    if (!currentUserAgenceId) return;
+    if (!currentUserAgenceId || toggling) return;
+    setToggling(priorityId);
 
     const existing = agencyPriorities.find(ap => ap.priority_id === priorityId);
-    
+
     try {
       if (existing) {
         const { error } = await supabase
           .from("agence_priority")
           .update({ is_active: !existing.is_active })
           .eq("id", existing.id);
-
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -77,116 +87,160 @@ export const PriorityAssignment: React.FC<Props> = ({ userRole, currentUserAgenc
             priority_id: priorityId,
             is_active: true
           });
-
         if (error) throw error;
       }
-      
-      await fetchAgencyPriorities();
+      await fetchPriorities();
     } catch (err) {
       const error = err as Error;
-      console.error("Error toggling priority:", error);
       alert(error.message || "Erreur lors de la modification");
+    } finally {
+      setToggling(null);
     }
   };
 
-  if (!currentUserAgenceId && userRole !== "super_admin") {
-    return <div className="p-4 text-center">Aucune agence associée à votre compte.</div>;
+  const isActive = (priorityId: string) => {
+    const ap = agencyPriorities.find(ap => ap.priority_id === priorityId);
+    return ap ? ap.is_active : false;
+  };
+
+  const activeCount = agencyPriorities.filter(ap => ap.is_active).length;
+  const paginated = globalPriorities.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(globalPriorities.length / itemsPerPage);
+
+  if (userRole !== "admin") {
+    return <div className="auth-permission-denied">Accès réservé aux administrateurs.</div>;
   }
 
   return (
     <div className="services-page">
       <header className="page-header">
         <div className="header-text">
-          <h1>Configuration des priorités</h1>
-          <p>Activez ou désactivez les niveaux de priorité disponibles sur votre borne.</p>
+          <h1>Affectation des priorités</h1>
+          <p>Activez ou désactivez les priorités pour votre agence</p>
+        </div>
+        <div style={{
+          background: "linear-gradient(135deg, #8b5cf6, #d4145a)",
+          padding: "8px 16px",
+          borderRadius: "12px",
+          color: "white",
+          fontWeight: 700,
+          fontSize: "0.9rem"
+        }}>
+          {activeCount} / {globalPriorities.length} activée(s)
         </div>
       </header>
 
-      <div className="content-card">
+      <div className="content-card" ref={tableContainerRef}>
         {fetchError && (
-          <div className="auth-message auth-message--error" style={{ marginBottom: "1rem" }}>
+          <div className="auth-message auth-message--error" style={{ marginBottom: "1.5rem" }}>
             {fetchError}
           </div>
         )}
-        
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "2rem" }}>Chargement...</div>
-        ) : (
-          <div className="priority-assignment-grid" style={{ 
-            display: "grid", 
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", 
-            gap: "20px",
-            padding: "10px"
-          }}>
-            {globalPriorities.map((priority) => {
-              const agencyPriority = agencyPriorities.find(ap => ap.priority_id === priority.id);
-              const isActive = agencyPriority ? agencyPriority.is_active : false;
 
-              return (
-                <div key={priority.id} className={`priority-assign-card ${isActive ? 'active' : ''}`} style={{
-                  background: "var(--bg-glass)",
-                  border: `1px solid ${isActive ? priority.couleur : 'rgba(255,255,255,0.05)'}`,
-                  borderRadius: "15px",
-                  padding: "20px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "15px",
-                  transition: "all 0.3s ease",
-                  position: "relative",
-                  overflow: "hidden"
-                }}>
-                  <div style={{ 
-                    position: "absolute", 
-                    top: "0", 
-                    right: "0", 
-                    width: "4px", 
-                    height: "100%", 
-                    backgroundColor: priority.couleur 
-                  }}></div>
-                  
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <h3 style={{ margin: "0", fontSize: "1.2rem", fontWeight: "bold" }}>{priority.nom}</h3>
-                      <p style={{ margin: "5px 0 0", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                        Poids: {priority.valeur} | Icône: {priority.icone}
-                      </p>
-                    </div>
-                    <div style={{ 
-                      width: "30px", 
-                      height: "30px", 
-                      borderRadius: "50%", 
-                      backgroundColor: priority.couleur,
-                      boxShadow: `0 0 15px ${priority.couleur}44`
-                    }}></div>
-                  </div>
-
-                  <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end" }}>
-                    <button 
-                      onClick={() => togglePriority(priority.id)}
-                      className={`auth-button ${isActive ? '' : 'auth-button--outline'}`}
-                      style={{ 
-                        padding: "8px 20px", 
-                        fontSize: "0.9rem",
-                        width: "auto",
-                        minWidth: "120px",
-                        backgroundColor: isActive ? priority.couleur : "transparent",
-                        borderColor: priority.couleur,
-                        color: isActive ? "#fff" : priority.couleur,
-                        boxShadow: isActive ? `0 4px 15px ${priority.couleur}66` : "none"
-                      }}
-                    >
-                      {isActive ? "✓ Activé" : "Désactivé"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            
-            {globalPriorities.length === 0 && !loading && (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "3rem", fontStyle: "italic", opacity: 0.6 }}>
-                Aucune priorité disponible dans le catalogue global.
-              </div>
+        <table className="premium-table">
+          <thead>
+            <tr>
+              <th>Priorité</th>
+              <th>Poids</th>
+              <th>Couleur</th>
+              <th style={{ textAlign: "right" }}>État / Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              [1, 2, 3].map(i => (
+                <tr key={i} style={{ opacity: 0.5 }}>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "1rem" }}>Chargement...</td>
+                </tr>
+              ))
+            ) : paginated.length > 0 ? (
+              paginated.map((p) => {
+                const active = isActive(p.id);
+                return (
+                  <tr key={p.id}>
+                    <td className="font-bold">
+                      <span style={{ marginRight: "8px" }}>{getIconEmoji(p.icone)}</span>
+                      {p.nom}
+                    </td>
+                    <td>
+                      <span style={{ 
+                        padding: "4px 10px", 
+                        borderRadius: "12px", 
+                        background: "#f1f5f9", 
+                        fontSize: "0.85rem",
+                        fontWeight: 600
+                      }}>
+                        Niveau {p.valeur}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ 
+                          width: "16px", 
+                          height: "16px", 
+                          borderRadius: "4px", 
+                          background: p.couleur,
+                          border: "1px solid rgba(0,0,0,0.1)"
+                        }} />
+                        <span style={{ color: "#64748b", fontSize: "0.85rem" }}>{p.couleur}</span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        className={`auth-button ${active ? "" : "secondary"}`}
+                        onClick={() => togglePriority(p.id)}
+                        disabled={toggling === p.id}
+                        style={{
+                          padding: "6px 16px",
+                          fontSize: "0.85rem",
+                          width: "auto",
+                          minWidth: "110px",
+                          background: active ? "linear-gradient(135deg, #22c55e, #16a34a)" : "#f1f5f9",
+                          color: active ? "white" : "#64748b",
+                          border: active ? "none" : "1px solid #e2e8f0"
+                        }}
+                      >
+                        {toggling === p.id ? "Attente..." : (active ? "✔ Activée" : "○ Désactivée")}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", padding: "3rem", color: "#64748b" }}>
+                  Aucune priorité disponible.
+                </td>
+              </tr>
             )}
+          </tbody>
+        </table>
+
+        {needsPagination && (
+          <div className="pagination-controls">
+            <button
+              className="pagination-btn"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+            >
+              ←
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                className={`pagination-btn ${currentPage === page ? "active" : ""}`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              className="pagination-btn"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              →
+            </button>
           </div>
         )}
       </div>

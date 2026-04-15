@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { supabase } from "../../../shared/api/supabaseClient";
+import { FiLock } from "react-icons/fi";
 
 import type { UserRole } from "../../../shared/types";
 
@@ -94,7 +95,7 @@ export const LoginForm: React.FC<Props> = ({ onLogin }) => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-card-header">
-          <div className="auth-card-icon">B</div>
+          <div className="auth-card-icon"><FiLock style={{ color: 'var(--primary-color)' }} /></div>
           <h2 className="auth-card-title">Connexion</h2>
           <p className="auth-card-subtitle">
             Gérez vos tickets en toute simplicité

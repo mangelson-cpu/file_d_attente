@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../../shared/api/supabaseClient";
+import { FiFolder } from "react-icons/fi";
 import type { Service, SousService } from "../../../shared/types";
 
 interface Props {
@@ -96,7 +97,7 @@ export const SousServiceModal: React.FC<Props> = ({
           ×
         </button>
         <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-          <div className="auth-card-icon">📂</div>
+          <div className="auth-card-icon"><FiFolder style={{ color: 'var(--primary-color)' }} /></div>
           <h2 className="auth-card-title">
             Sous-services pour : {service.nom_service}
           </h2>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicPageSize } from "../../../shared/hooks/useDynamicPageSize";
 import { supabase } from "../../../shared/api/supabaseClient";
+import { FiUser, FiEdit2 } from "react-icons/fi";
 import type { UserRole, Agence, User } from "../../../shared/types";
 
 interface Props {
@@ -242,7 +243,7 @@ export const CreateUserForm: React.FC<Props> = ({
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">👤</div>
+              <div className="auth-card-icon"><FiUser style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">Nouvel Agent</h2>
               <p className="auth-card-subtitle">
                 Remplissez les informations ci-dessous
@@ -364,7 +365,7 @@ export const CreateUserForm: React.FC<Props> = ({
               ×
             </button>
             <div className="auth-card-header" style={{ marginBottom: "2rem" }}>
-              <div className="auth-card-icon">✏️</div>
+              <div className="auth-card-icon"><FiEdit2 style={{ color: 'var(--primary-color)' }} /></div>
               <h2 className="auth-card-title">Modifier l'agent</h2>
               <p className="auth-card-subtitle">
                 Modifiez les informations de l'agent
